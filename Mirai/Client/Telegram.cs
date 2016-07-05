@@ -11,17 +11,17 @@ namespace Mirai.Client
         private TelegramBotClient Client;
         private string Token;
 
-        public Telegram(string Token)
-        {
-            this.Token = Token;
-        }
-
         public bool Connected
         {
             get
             {
                 return Client.TestApiAsync().Result;
             }
+        }
+
+        public Telegram(string Token)
+        {
+            this.Token = Token;
         }
 
         async Task IClient.Connect()
@@ -45,15 +45,32 @@ namespace Mirai.Client
             {
                 Id = UserData.Id.ToString(),
                 Name = UserData.Username,
-                Type = "Telegram"
+                Type = typeof(Telegram)
             };
         }
 
         private void OnMessage(object sender, MessageEventArgs e)
         {
+            int FeedId;
             using (var Context = Bot.GetDb)
             {
-                var Feed = from Rows in Context.Feed where Rows.Id == "5" select Rows;
+                FeedId = (from Rows
+                    in Context.TelegramFeedlink
+                    where Rows.Token == Token && Rows.Chat == e.Message.Chat.Id
+                    select Rows.Feed)
+                    .FirstOrDefault();
+            }
+
+            if (FeedId > 0)
+            {
+                Bot.Feeds[FeedId].Handle(this, new Message()
+                {
+                    Type = typeof(Telegram),
+                    Id = e.Message.MessageId,
+                    Sender = e.Message.From.Id,
+                    SenderMention = $"@{e.Message.From.Username}",
+                    Text = e.Message.Text
+                });
             }
 
             Bot.Log("TG " + e.Message.Text);

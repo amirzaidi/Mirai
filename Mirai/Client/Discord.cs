@@ -1,5 +1,6 @@
 ﻿using Discord;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Mirai.Client
@@ -55,12 +56,37 @@ namespace Mirai.Client
             {
                 Id = Client.CurrentUser.Id.ToString(),
                 Name = Client.CurrentUser.Name,
-                Type = "Discord"
+                Type = typeof(Discord)
             };
         }
 
         private void MessageReceived(object sender, MessageEventArgs e)
         {
+            int FeedId;
+            using (var Context = Bot.GetDb)
+            {
+                FeedId = (from Rows 
+                    in Context.DiscordFeedlink
+                    where Rows.App == App && Rows.TextChannel == e.Channel.Id.ToString()
+                    select Rows.Feed)
+                    .FirstOrDefault();
+            }
+
+            if (FeedId > 0)
+            {
+                string Command = null;
+                string Args = null;
+
+                Bot.Feeds[FeedId].Handle(this, new Message()
+                {
+                    Type = typeof(Discord),
+                    Id = e.User.Id,
+                    Sender = e.User.Id,
+                    SenderMention = $"@{e.User.Name}",
+                    Text = e.Message.Text
+                }, Command, Args);
+            }
+
             Bot.Log("Discord " + e.Message.Text);
             //Feed handler
         }

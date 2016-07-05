@@ -1,5 +1,6 @@
 ﻿using Mirai.Database.Tables;
 using System.Data.Entity;
+using System.Data.Entity.ModelConfiguration.Conventions;
 
 namespace Mirai.Database
 {
@@ -16,6 +17,11 @@ namespace Mirai.Database
         internal MiraiContext() : base("name=Mirai")
         {
             Bot.Log("Opening database connection");
+        }
+
+        protected override void OnModelCreating(DbModelBuilder ModelBuilder)
+        {
+            ModelBuilder.Conventions.Remove<PluralizingTableNameConvention>();
         }
 
         internal new void Dispose()

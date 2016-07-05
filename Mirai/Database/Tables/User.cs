@@ -2,10 +2,10 @@
 
 namespace Mirai.Database.Tables
 {
-    class Feed
+    class User
     {
         [Key]
-        public int Id { get; set; }
-        public string Name { get; set; }
+        public string Id { get; set; }
+        public int Rank { get; set; }
     }
 }

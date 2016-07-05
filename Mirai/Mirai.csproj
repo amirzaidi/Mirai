@@ -112,6 +112,7 @@
     <Compile Include="Client\Discord.cs" />
     <Compile Include="Bot.cs" />
     <Compile Include="Database\MiraiContext.cs" />
+    <Compile Include="Database\Tables\User.cs" />
     <Compile Include="Database\Tables\Song.cs" />
     <Compile Include="Database\Tables\TelegramFeedlink.cs" />
     <Compile Include="Database\Tables\DiscordFeedlink.cs" />
@@ -119,6 +120,8 @@
     <Compile Include="Database\Tables\Config.cs" />
     <Compile Include="Database\Tables\TelegramCredentials.cs" />
     <Compile Include="Database\Tables\DiscordCredentials.cs" />
+    <Compile Include="FeedContext.cs" />
+    <Compile Include="Message.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Client\Telegram.cs" />
   </ItemGroup>
