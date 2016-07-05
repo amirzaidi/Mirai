@@ -1,24 +1,233 @@
 ﻿using Mirai.Client;
+using Mirai.Commands;
+using Mirai.Handlers;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Mirai
 {
+    struct Destination
+    {
+        internal string Token;
+        internal string Chat;
+    }
+
+    struct SendMessage
+    {
+        internal int Id;
+        internal string Chat;
+        internal string Text;
+    }
+
     class FeedContext
     {
-        private int Id;
+        internal static int HandlersRunning = 0;
+        private static int CurrentMessage = 1;
+
+        internal int Id
+        {
+            get;
+            private set;
+        }
+        
+        internal Destination[] TextDestination = new Destination[0];
+        internal Destination[] AudioDestination = new Destination[0];
+        internal MusicHandler Music;
+        internal TriviaHandler Trivia;
+        internal Task HandleTask;
 
         internal FeedContext(int Id)
         {
             this.Id = Id;
+
+            HandleTask = StartHandler();
         }
 
-        internal void StartHandler()
+        private async Task StartHandler()
         {
-            //Music, trivia, etc
+            await Task.Yield();
+
+            var Handlers = new List<IHandler>();
+
+            Music = new MusicHandler(this);
+            Handlers.Add(Music);
+
+            Trivia = new TriviaHandler(this);
+            Handlers.Add(Trivia);
+
+            Interlocked.Increment(ref HandlersRunning);
+
+            Task Timer;
+            while (!Bot.ShutdownRequested)
+            {
+                Timer = Task.Delay(1);
+
+                Parallel.ForEach(Handlers, async Handler =>
+                {
+                    try
+                    {
+                        await Handler.Tick();
+                    }
+                    catch (Exception Ex)
+                    {
+                        Bot.Log(Ex);
+                    }
+                });
+                
+                await Timer;
+            }
+
+            Parallel.ForEach(Handlers, async Handler =>
+            {
+                try
+                {
+                    await Handler.Save();
+                }
+                catch { }
+            });
         }
 
-        internal void Handle(IClient Client, Message Message)
+        internal async void Handle(ReceivedMessage Message)
         {
+            if (!Bot.ShutdownRequested)
+            {
+                Message.Feed = this;
+                Parser.Parse(Message);
+            }
+        }
 
+        internal async Task<int> Send(Destination Destination, string Text, int Id = 0)
+        {
+            if (Id == 0)
+            {
+                Id = Interlocked.Increment(ref CurrentMessage);
+            }
+
+            await Bot.Clients[Destination.Token].Send(new SendMessage
+            {
+                Id = Id,
+                Chat = Destination.Chat,
+                Text = Text
+            });
+
+            return Id;
+        }
+
+        internal Task Edit(int Id, Destination Destination, string Text)
+        {
+            return Bot.Clients[Destination.Token].Edit(new SendMessage
+            {
+                Id = Id,
+                Chat = Destination.Chat,
+                Text = Text
+            });
+        }
+
+        internal Task Delete(int Id, Destination Destination)
+        {
+            return Bot.Clients[Destination.Token].Delete(new SendMessage
+            {
+                Id = Id,
+                Chat = Destination.Chat,
+                Text = null
+            });
+        }
+
+        internal async Task Stream(Destination Destination, byte[] Audio)
+        {
+            if (Bot.Clients.ContainsKey(Destination.Token))
+            {
+                await Bot.Clients[Destination.Token].Stream(Destination.Chat, Audio);
+            }
+        }
+
+        internal async Task<int> SendAll(string Text)
+        {
+            var Id = Interlocked.Increment(ref CurrentMessage);
+            var Tasks = new Task[TextDestination.Length];
+            for (var i = 0; i < TextDestination.Length; i++)
+            {
+                Tasks[i] = Send(TextDestination[i], Text, Id);
+            }
+
+            Tasks.WaitAllAsync();
+            return Id;
+        }
+
+        internal async Task EditAll(int Id, string Text)
+        {
+            var Tasks = new Task[TextDestination.Length];
+            for (var i = 0; i < TextDestination.Length; i++)
+            {
+                Tasks[i] = Edit(Id, TextDestination[i], Text);
+            }
+
+            await Tasks.WaitAllAsync();
+        }
+
+        internal async Task DeleteAll(int Id)
+        {
+            var Tasks = new Task[TextDestination.Length];
+            for (var i = 0; i < TextDestination.Length; i++)
+            {
+                Tasks[i] = Delete(Id, TextDestination[i]);
+            }
+
+            await Tasks.WaitAllAsync();
+        }
+
+        internal async Task StreamAll(byte[] Audio)
+        {
+            var Tasks = new Task[AudioDestination.Length];
+            for (var i = 0; i < AudioDestination.Length; i++)
+            {
+                Tasks[i] = Stream(AudioDestination[i], Audio);
+            }
+            
+            Tasks.WaitAllAsync();
+        }
+
+        internal void UpdateCache()
+        {
+            var TextDestinationList = new List<Destination>();
+            var AudioDestinationList = new List<Destination>();
+
+            using (var Context = Bot.GetDb)
+            {
+                foreach (var FeedLink in from Rows in Context.DiscordFeedlink where Rows.Feed == Id select Rows)
+                {
+                    TextDestinationList.Add(new Destination
+                    {
+                        Token = FeedLink.Token,
+                        Chat = FeedLink.TextChannel
+                    });
+
+                    if (FeedLink.VoiceChannel != null)
+                    {
+                        AudioDestinationList.Add(new Destination
+                        {
+                            Token = FeedLink.Token,
+                            Chat = FeedLink.VoiceChannel
+                        });
+                    }
+                }
+
+                foreach (var FeedLink in from Rows in Context.TelegramFeedlink where Rows.Feed == Id select Rows)
+                {
+                    TextDestinationList.Add(new Destination
+                    {
+                        Token = FeedLink.Token,
+                        Chat = FeedLink.Chat.ToString()
+                    });
+                }
+            }
+
+            TextDestination = TextDestinationList.ToArray();
+            AudioDestination = AudioDestinationList.ToArray();
         }
     }
 }

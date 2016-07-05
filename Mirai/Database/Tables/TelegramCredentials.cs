@@ -6,5 +6,6 @@ namespace Mirai.Database.Tables
     {
         [Key]
         public string Token { get; set; }
+        public long Owner { get; set; }
     }
 }

@@ -11,8 +11,5 @@ namespace Mirai.Database.Tables
         [Key, Column(Order = 2)]
         public long Chat { get; set; }
         public int Feed { get; set; }
-
-        //[ForeignKey("Feed")]
-        //public virtual Feed FeedObj { get; set; }
     }
 }
