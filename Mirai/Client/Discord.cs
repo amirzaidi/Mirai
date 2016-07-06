@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using Discord.Audio;
+using System.Collections.Generic;
 
 namespace Mirai.Client
 {
@@ -17,7 +18,7 @@ namespace Mirai.Client
         private string App;
         private string Token;
         private string Mention;
-        private ulong Owner;
+        public string Owner { get; set; }
 
         public bool Connected
         {
@@ -27,11 +28,10 @@ namespace Mirai.Client
             }
         }
 
-        public Discord(string App, string Token, string Owner)
+        public Discord(string App, string Token)
         {
             this.App = App;
             this.Token = Token;
-            this.Owner = ulong.Parse(Owner);
 
             Client.UsingAudio(new AudioServiceConfigBuilder()
             {
@@ -137,7 +137,14 @@ namespace Mirai.Client
 
             if (Sound != null)
             {
-                await AudioClient.OutputStream.WriteAsync(Sound, 0, Sound.Length);
+                try
+                {
+                    await AudioClient.OutputStream.WriteAsync(Sound, 0, Sound.Length);
+                }
+                catch (Exception Ex)
+                {
+                    Bot.Log(Ex);
+                }
             }
         }
 
@@ -168,16 +175,14 @@ namespace Mirai.Client
                 //Remove this query
                 using (var Context = Bot.GetDb)
                 {
-                    FeedLink = (from Rows in Context.DiscordFeedlink
-                                where Rows.Token == Token && Rows.TextChannel == TextChannel
-                                select Rows).FirstOrDefault();
+                    FeedLink = Context.DiscordFeedlink.Where(x => x.Token == Token && x.TextChannel == TextChannel).FirstOrDefault();
                 }
 
                 string RawText = e.Message.RawText;
                 byte JoinFeedId;
                 if (FeedLink != null)
                 {
-                    if (e.User.Id == Owner)
+                    if (e.User.Id.ToString() == Owner)
                     {
                         if (RawText == Mention + " " + Bot.LeaveFeed)
                         {
@@ -215,9 +220,15 @@ namespace Mirai.Client
                             Chat = e.Channel.Id.ToString()
                         },
                         Id = e.User.Id,
-                        Sender = e.User.Id,
-                        SenderMention = $"@{e.User.Name}",
-                        Text = RawText
+                        Sender = e.User.Id.ToString(),
+                        SenderMention = $"<@{e.User.Id}>",
+                        Text = RawText,
+                        Mentions = e.Message.MentionedUsers.Where(x => !x.IsBot).Select(x => new ReceivedMessageMention
+                        {
+                            Id = x.Id.ToString(),
+                            Mention = $"<@{x.Id}>"
+                        }).ToArray(),
+                        State = null
                     };
 
                     var Trimmed = string.Empty;
@@ -235,10 +246,10 @@ namespace Mirai.Client
                         Message.Command = Trimmed.Split(' ')[0];
                         Message.Text = Trimmed.Substring(Message.Command).TrimStart();
                     }
-
+                    
                     Bot.Feeds[FeedLink.Feed].Handle(Message);
                 }
-                else if (e.User.Id == Owner)
+                else if (e.User.Id.ToString() == Owner)
                 {
                     var JoinFeed = Mention + " " + Bot.JoinFeed + " ";
                     if (RawText.StartsWith(JoinFeed) && byte.TryParse(RawText.Substring(JoinFeed), out JoinFeedId) && JoinFeedId < Bot.Feeds.Length)

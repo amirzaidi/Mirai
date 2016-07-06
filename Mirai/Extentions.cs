@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Threading.Tasks;
@@ -57,6 +58,23 @@ namespace Mirai
             T Result = default(T);
             while (Queue.Count > 0 && !Queue.TryDequeue(out Result)) ;
             return Result;
+        }
+
+        public static int[] ParseInts(this object Text, char Separator = ',', int Offset = 0)
+        {
+            var SplitString = ((string)Text).Split(',');
+            var Ints = new List<int>();
+
+            int Num;
+            foreach (var Part in SplitString)
+            {
+                if (int.TryParse(Part.Trim(), out Num) && !Ints.Contains(Num + Offset))
+                {
+                    Ints.Add(Num + Offset);
+                }
+            }
+
+            return Ints.ToArray();
         }
     }
 }

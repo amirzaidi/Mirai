@@ -161,7 +161,10 @@
     <Compile Include="Commands\HandleSearch.cs" />
     <Compile Include="Commands\HandleTrivia.cs" />
     <Compile Include="Commands\Parser.cs" />
+    <Compile Include="ConsoleEvents.cs" />
     <Compile Include="Database\MiraiContext.cs" />
+    <Compile Include="Database\Tables\MinRank.cs" />
+    <Compile Include="Database\Tables\Feed.cs" />
     <Compile Include="Database\Tables\User.cs" />
     <Compile Include="Database\Tables\Song.cs" />
     <Compile Include="Database\Tables\TelegramFeedlink.cs" />

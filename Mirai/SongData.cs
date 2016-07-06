@@ -27,12 +27,12 @@ namespace Mirai
         {
             get
             {
-                if (FullName.Length < 50)
+                if (FullName.Length < 60)
                 {
                     return FullName;
                 }
 
-                return FullName.Substring(0, 50);
+                return FullName.Substring(0, 60);
             }
         }
         internal string FullName;

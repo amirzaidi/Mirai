@@ -1,7 +1,6 @@
 ﻿using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
 using Mirai.Client;
-using Mirai.Database.Tables;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -13,7 +12,8 @@ namespace Mirai
 {
     class Bot
     {
-        internal static FeedContext[] Feeds = new FeedContext[10];
+        //Change 4 to amount of feeds
+        internal static FeedContext[] Feeds = new FeedContext[4];
         internal static ConcurrentDictionary<string, IClient> Clients = new ConcurrentDictionary<string, IClient>();
         internal const string Command = "/";
         internal const string JoinFeed = "joinfeed";
@@ -45,6 +45,8 @@ namespace Mirai
             
             Task.WaitAll(Feeds.Select(x => x.HandleTask).ToArray());
             Task.WaitAll(Clients.Values.Select(x => x.Disconnect()).ToArray());
+
+            Environment.Exit(0);
         }
 
         static async void LoadAsync()
@@ -53,7 +55,7 @@ namespace Mirai
 
             using (var Context = GetDb)
             {
-                foreach (var KVP in from Rows in Context.Config select Rows)
+                foreach (var KVP in Context.Config)
                 {
                     Config[KVP.Name] = KVP.Value;
                 }
@@ -63,21 +65,25 @@ namespace Mirai
                     ApiKey = Config["Google"]
                 });
 
-                ;
-                
-                for (int i = 0; i < Feeds.Length; i++)
+                for (byte i = 0; i < Feeds.Length; i++)
                 {
                     Feeds[i] = new FeedContext(i);
                 }
 
-                foreach (var Cred in from Rows in Context.DiscordCredentials select Rows)
+                foreach (var Cred in Context.DiscordCredentials)
                 {
-                    Clients.TryAdd(Cred.Token, new Client.Discord(Cred.App, Cred.Token, Cred.Owner));
+                    Clients.TryAdd(Cred.Token, new Client.Discord(Cred.App, Cred.Token)
+                    {
+                        Owner = Cred.Owner
+                    });
                 }
 
-                foreach (var Cred in from Rows in Context.TelegramCredentials select Rows)
+                foreach (var Cred in Context.TelegramCredentials)
                 {
-                    Clients.TryAdd(Cred.Token, new Client.Telegram(Cred.Token, Cred.Owner));
+                    Clients.TryAdd(Cred.Token, new Client.Telegram(Cred.Token)
+                    {
+                        Owner = Cred.Owner.ToString()
+                    });
                 }
             }
 
@@ -92,6 +98,11 @@ namespace Mirai
             }
 
             UpdateCache();
+            ConsoleEvents.SetHandler(delegate
+            {
+                ShutdownRequested = true;
+                Thread.Sleep(int.MaxValue);
+            });
 
             ShutdownCode = new Random().Next(0, 9999).ToString().PadLeft(4, '0');
             Log($"Fully functional - Shutdown code is {ShutdownCode}");
@@ -101,15 +112,11 @@ namespace Mirai
         {
             lock (Feeds)
             {
-                foreach (var Client in Clients.Values)
-                {
-                    Client.UpdateCache();
-                }
-
-                foreach (var Feed in Feeds)
-                {
-                    Feed.UpdateCache();
-                }
+                Task.WaitAll(
+                    Clients.Values.Select(x => x.UpdateCache()).Concat(
+                        Feeds.Select(x => x.UpdateCache())
+                        )
+                    .ToArray());
             }
         }
 

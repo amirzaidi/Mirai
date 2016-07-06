@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using Mirai.Database.Tables;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,8 +16,8 @@ namespace Mirai.Handlers
     class MusicHandler : IHandler
     {
         private FeedContext Feed;
-        private const int MaxQueued = 15;
-        internal ConcurrentQueue<TitledQuery> Queue;
+        internal const int MaxQueued = 25;
+        internal ConcurrentQueue<TitledQuery> Queue = new ConcurrentQueue<TitledQuery>();
         internal MusicProcessor Playing;
 
         private byte[] CurrentSend = null;
@@ -29,8 +30,17 @@ namespace Mirai.Handlers
             {
                 var Text = new StringBuilder();
 
-                Text.Append("Playing ");
-                Text.Append(Playing.Song.Title);
+                if (Playing == null)
+                {
+                    Text.Append("Nothing is playing");
+                }
+                else
+                {
+                    Text.Append("Playing `");
+                    Text.Append(Playing.Song.Title);
+                    Text.Append("`");
+                }
+
                 Text.Append("\n");
 
                 var Songs = Queue.ToArray();
@@ -57,7 +67,7 @@ namespace Mirai.Handlers
             private set;
         }
 
-        public MusicHandler(FeedContext Feed)
+        internal MusicHandler(FeedContext Feed)
         {
             this.Feed = Feed;
             PlayingMessageId = 0;
@@ -67,12 +77,7 @@ namespace Mirai.Handlers
                 string[] Queries;
                 using (var Context = Bot.GetDb)
                 {
-                    var QuerySets = from Rows in Context.Song
-                                  where Rows.Feed == Feed.Id
-                                  orderby Rows.Place ascending
-                                  select Rows.Query;
-
-                    Queries = QuerySets.ToArray();
+                    Queries = Context.Song.Where(x => x.Feed == Feed.Id).OrderBy(x => x.Place).Select(x => x.Query).ToArray();
                 }
 
                 Queue = new ConcurrentQueue<TitledQuery>(Queries.Select(Query => new TitledQuery
@@ -83,7 +88,7 @@ namespace Mirai.Handlers
             });
         }
 
-        public async Task UpdateAll()
+        internal async Task UpdateAll()
         {
             if (PlayingMessageId == 0)
             {
@@ -95,7 +100,7 @@ namespace Mirai.Handlers
             }
         }
 
-        public async Task ResendUpdate(Destination Destination)
+        internal async Task ResendUpdate(Destination Destination)
         {
             if (PlayingMessageId == 0)
             {
@@ -116,6 +121,7 @@ namespace Mirai.Handlers
                 {
                     Playing.Dispose();
                     Playing = null;
+                    await UpdateAll();
                 }
 
                 if (Playing == null)
@@ -160,7 +166,7 @@ namespace Mirai.Handlers
             }
         }
 
-        internal async Task AddSong(string Query, string Title)
+        internal async Task<int> AddSong(string Query, string Title, bool Update = true)
         {
             if (Queue.Count < MaxQueued)
             {
@@ -170,13 +176,131 @@ namespace Mirai.Handlers
                     Title = Title
                 });
 
-                await Feed.SendAll($"Added {Title}");
+                if (Update)
+                {
+                    UpdateAll();
+                }
+
+                return Queue.Count;
             }
+
+            return 0;
+        }
+
+        internal string Push(int Place, int ToPlace)
+        {
+            var NewQueue = new ConcurrentQueue<TitledQuery>();
+            var Songs = Queue.ToList();
+            if (Place > 0 && ToPlace > 0 && Place != ToPlace && Songs.Count >= Place && Songs.Count >= ToPlace)
+            {
+                var Pushed = Songs[Place - 1];
+                Songs.Remove(Pushed);
+                Songs.Insert(ToPlace - 1, Pushed);
+
+                foreach (var Song in Songs)
+                {
+                    NewQueue.Enqueue(Song);
+                }
+
+                Queue = NewQueue;
+                UpdateAll();
+
+                return Pushed.Title;
+            }
+
+            return null;
+        }
+
+        internal string Repeat(ref int Count)
+        {
+            if (Playing != null)
+            {
+                var Songs = Queue.ToArray();
+                if (Count + Songs.Length > MaxQueued)
+                {
+                    Count = MaxQueued - Songs.Length;
+                }
+
+                var NewQueue = new ConcurrentQueue<TitledQuery>();
+
+                for (int i = 0; i < Count; i++)
+                {
+                    NewQueue.Enqueue(new TitledQuery
+                    {
+                        Query = Playing.Song.Query,
+                        Title = Playing.Song.Title
+                    });
+                }
+
+                foreach (var Song in Queue)
+                {
+                    NewQueue.Enqueue(Song);
+                }
+
+                Queue = NewQueue;
+                UpdateAll();
+
+                return Playing.Song.Title;
+            }
+
+            return null;
+        }
+
+        internal async Task<string[]> RemoveSongs(int[] Places)
+        {
+            var Removed = new List<string>();
+            int i = 0;
+
+            var NewQueue = new ConcurrentQueue<TitledQuery>();
+            foreach (var Song in Queue.ToArray())
+            {
+                if (Places.Contains(++i))
+                {
+                    Removed.Add($"{i}. {Song.Title}");
+                }
+                else
+                {
+                    NewQueue.Enqueue(Song);
+                }
+            }
+
+            if (Removed.Count > 0)
+            {
+                Queue = NewQueue;
+                UpdateAll();
+            }
+
+            return Removed.ToArray();
         }
 
         public async Task Save()
         {
-            //Serialize playlist
+            using (var Context = Bot.GetDb)
+            {
+                Context.Song.RemoveRange(Context.Song.Where(x => x.Feed == Feed.Id));
+
+                var Queue = this.Queue.ToArray();
+                var Songs = new Song[Queue.Length + 1];
+                Songs[0] = new Song
+                {
+                    Feed = Feed.Id,
+                    Place = 0,
+                    Query = Playing.Song.Query
+                };
+
+                for (int i = 0; i < Queue.Length; i++)
+                {
+                    Songs[i + 1] = new Song
+                    {
+                        Feed = Feed.Id,
+                        Place = i + 1,
+                        Query = Queue[i].Query
+                    };
+                }
+
+                Context.Song.AddRange(Songs);
+                await Context.SaveChangesAsync();
+            }
         }
     }
 }

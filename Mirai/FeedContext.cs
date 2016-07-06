@@ -1,8 +1,7 @@
-﻿using Mirai.Client;
-using Mirai.Commands;
+﻿using Mirai.Commands;
+using Mirai.Database.Tables;
 using Mirai.Handlers;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -21,6 +20,7 @@ namespace Mirai
         internal int Id;
         internal string Chat;
         internal string Text;
+        internal object State;
     }
 
     class FeedContext
@@ -28,7 +28,7 @@ namespace Mirai
         internal static int HandlersRunning = 0;
         private static int CurrentMessage = 1;
 
-        internal int Id
+        internal byte Id
         {
             get;
             private set;
@@ -39,8 +39,9 @@ namespace Mirai
         internal MusicHandler Music;
         internal TriviaHandler Trivia;
         internal Task HandleTask;
+        internal Feed FeedInfo;
 
-        internal FeedContext(int Id)
+        internal FeedContext(byte Id)
         {
             this.Id = Id;
 
@@ -100,7 +101,7 @@ namespace Mirai
             }
         }
 
-        internal async Task<int> Send(Destination Destination, string Text, int Id = 0)
+        internal async Task<int> Send(Destination Destination, string Text, int Id = 0, object State = null)
         {
             if (Id == 0)
             {
@@ -111,7 +112,8 @@ namespace Mirai
             {
                 Id = Id,
                 Chat = Destination.Chat,
-                Text = Text
+                Text = Text,
+                State = State
             });
 
             return Id;
@@ -191,14 +193,26 @@ namespace Mirai
             Tasks.WaitAllAsync();
         }
 
-        internal void UpdateCache()
+        internal async Task UpdateCache()
         {
             var TextDestinationList = new List<Destination>();
             var AudioDestinationList = new List<Destination>();
 
             using (var Context = Bot.GetDb)
             {
-                foreach (var FeedLink in from Rows in Context.DiscordFeedlink where Rows.Feed == Id select Rows)
+                FeedInfo = Context.Feed.Where(x => x.Id == Id + 1).FirstOrDefault();
+                if (FeedInfo == null)
+                {
+                    FeedInfo = new Feed
+                    {
+                        Id = Id + 1
+                    };
+
+                    Context.Feed.Add(FeedInfo);
+                    await Context.SaveChangesAsync();
+                }
+
+                foreach (var FeedLink in Context.DiscordFeedlink.Where(x => x.Feed == Id))
                 {
                     TextDestinationList.Add(new Destination
                     {
@@ -216,7 +230,7 @@ namespace Mirai
                     }
                 }
 
-                foreach (var FeedLink in from Rows in Context.TelegramFeedlink where Rows.Feed == Id select Rows)
+                foreach (var FeedLink in Context.TelegramFeedlink.Where(x => x.Feed == Id))
                 {
                     TextDestinationList.Add(new Destination
                     {

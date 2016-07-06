@@ -5,6 +5,7 @@ namespace Mirai.Client
     interface IClient
     {
         bool Connected { get; }
+        string Owner { get; set; }
 
         Task Connect();
         Task Disconnect();

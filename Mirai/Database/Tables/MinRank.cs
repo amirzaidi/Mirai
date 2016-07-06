@@ -3,13 +3,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Mirai.Database.Tables
 {
-    class Song
+    class MinRank
     {
         [Key, Column(Order = 1)]
         public byte Feed { get; set; }
 
         [Key, Column(Order = 2)]
-        public int Place { get; set; }
-        public string Query { get; set; }
+        public string Command { get; set; }
+        public byte Rank { get; set; }
     }
 }
