@@ -184,13 +184,20 @@ namespace Mirai
 
         internal async Task StreamAll(byte[] Audio)
         {
-            var Tasks = new Task[AudioDestination.Length];
-            for (var i = 0; i < AudioDestination.Length; i++)
+            try
             {
-                Tasks[i] = Stream(AudioDestination[i], Audio);
+                var Tasks = new Task[AudioDestination.Length];
+                for (var i = 0; i < AudioDestination.Length; i++)
+                {
+                    Tasks[i] = Stream(AudioDestination[i], Audio);
+                }
+
+                Tasks.WaitAllAsync();
             }
-            
-            Tasks.WaitAllAsync();
+            catch (IndexOutOfRangeException)
+            {
+                //Update while sending
+            }
         }
 
         internal async Task UpdateCache()

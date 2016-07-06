@@ -76,5 +76,13 @@ namespace Mirai
 
             return Ints.ToArray();
         }
+
+        public static async Task UnlessNull(this Task Task)
+        {
+            if (Task != null)
+            {
+                await Task;
+            }
+        }
     }
 }

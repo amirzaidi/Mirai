@@ -113,15 +113,18 @@ namespace Mirai.Client
             var ChatId = ulong.Parse(Chat);
 
             IAudioClient AudioClient;
-            if (!AudioClients.TryGetValue(ChatId, out AudioClient))
+            if (!AudioClients.TryGetValue(ChatId, out AudioClient) || AudioClient.Channel.Id != ChatId)
             {
                 var Channel = Client.Servers.SelectMany(x => x.VoiceChannels).Where(x => x.Id == ChatId).FirstOrDefault();
                 if (Channel == null)
                 {
                     return;
                 }
-
+                
                 AudioClient = await Channel.JoinAudio();
+
+                IAudioClient Old;
+                AudioClients.TryRemove(ChatId, out Old);
                 if (!AudioClients.TryAdd(ChatId, AudioClient))
                 {
                     //Bot.Log("Failed to add audio client to the Audioclient list");
@@ -199,15 +202,32 @@ namespace Mirai.Client
                         }
                         else if (RawText == Mention + " setaudio")
                         {
+                            var Success = false;
+                            var ServerVoiceChannelIds = e.Server.VoiceChannels.Select(y => y.Id.ToString()).ToList();
+                            var TextChannelId = e.Channel.Id.ToString();
+
                             using (var Context = Bot.GetDb)
                             {
-                                Context.DiscordFeedlink.Attach(FeedLink);
-                                FeedLink.VoiceChannel = e.User.VoiceChannel?.Id.ToString();
-                                await Context.SaveChangesAsync();
+                                if (!Context.DiscordFeedlink.Any(x => x.TextChannel != TextChannelId && ServerVoiceChannelIds.Contains(x.VoiceChannel)))
+                                {
+                                    Context.DiscordFeedlink.Attach(FeedLink);
+                                    FeedLink.VoiceChannel = e.User.VoiceChannel?.Id.ToString();
+                                    await Context.SaveChangesAsync();
+                                    Success = true;
+
+                                }
                             }
 
-                            Bot.UpdateCache();
-                            Bot.Log($"Set audio to {e.User.VoiceChannel?.Name} on {Mention}");
+                            if (Success)
+                            {
+                                Bot.UpdateCache();
+                                Bot.Log($"Set audio to {e.User.VoiceChannel?.Name} on {Mention}");
+                            }
+                            else
+                            {
+                                Bot.Log($"Can't set audio to {e.User.VoiceChannel?.Name} on {Mention}");
+                            }
+
                             return;
                         }
                     }
