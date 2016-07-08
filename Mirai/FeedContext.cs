@@ -9,20 +9,6 @@ using System.Threading.Tasks;
 
 namespace Mirai
 {
-    struct Destination
-    {
-        internal string Token;
-        internal string Chat;
-    }
-
-    struct SendMessage
-    {
-        internal int Id;
-        internal string Chat;
-        internal string Text;
-        internal object State;
-    }
-
     class FeedContext
     {
         internal static int HandlersRunning = 0;
@@ -44,7 +30,6 @@ namespace Mirai
         internal FeedContext(byte Id)
         {
             this.Id = Id;
-
             HandleTask = StartHandler();
         }
 
@@ -92,16 +77,7 @@ namespace Mirai
             });
         }
 
-        internal async void Handle(ReceivedMessage Message)
-        {
-            if (!Bot.ShutdownRequested)
-            {
-                Message.Feed = this;
-                Parser.Parse(Message);
-            }
-        }
-
-        internal async Task<int> Send(Destination Destination, string Text, int Id = 0, object State = null)
+        internal async Task<int> Send(Destination Destination, string Text, bool Markdown = true, object State = null, int Id = 0, string ReplyId = null)
         {
             if (Id == 0)
             {
@@ -113,19 +89,24 @@ namespace Mirai
                 Id = Id,
                 Chat = Destination.Chat,
                 Text = Text,
-                State = State
+                Markdown = Markdown,
+                State = State,
+                ReplyId = ReplyId
             });
 
             return Id;
         }
 
-        internal Task Edit(int Id, Destination Destination, string Text)
+        internal Task Edit(int Id, Destination Destination, string Text, bool Markdown = true, object State = null, string ReplyId = null)
         {
             return Bot.Clients[Destination.Token].Edit(new SendMessage
             {
                 Id = Id,
                 Chat = Destination.Chat,
-                Text = Text
+                Text = Text,
+                Markdown = Markdown,
+                State = State,
+                ReplyId = ReplyId
             });
         }
 
@@ -147,25 +128,25 @@ namespace Mirai
             }
         }
 
-        internal async Task<int> SendAll(string Text)
+        internal async Task<int> SendAll(string Text, bool Markdown = true, object State = null)
         {
             var Id = Interlocked.Increment(ref CurrentMessage);
             var Tasks = new Task[TextDestination.Length];
             for (var i = 0; i < TextDestination.Length; i++)
             {
-                Tasks[i] = Send(TextDestination[i], Text, Id);
+                Tasks[i] = Send(TextDestination[i], Text, Markdown, State, Id);
             }
 
             Tasks.WaitAllAsync();
             return Id;
         }
 
-        internal async Task EditAll(int Id, string Text)
+        internal async Task EditAll(int Id, string Text, bool Markdown = true, object State = null)
         {
             var Tasks = new Task[TextDestination.Length];
             for (var i = 0; i < TextDestination.Length; i++)
             {
-                Tasks[i] = Edit(Id, TextDestination[i], Text);
+                Tasks[i] = Edit(Id, TextDestination[i], Text, Markdown, State);
             }
 
             await Tasks.WaitAllAsync();

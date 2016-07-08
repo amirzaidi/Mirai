@@ -4,6 +4,7 @@ using Mirai.Client;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -94,7 +95,7 @@ namespace Mirai
                 await Conn.Connect();
                 var Info = await Conn.Info();
 
-                Log($"Connected to {Info.Type} as {Info.Name}");
+                Log($"Connected to {Info.Type} as {Info.Name}\n - Join {Info.Join}");
             }
 
             UpdateCache();
@@ -103,6 +104,18 @@ namespace Mirai
                 ShutdownRequested = true;
                 Thread.Sleep(int.MaxValue);
             });
+
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                var StartInfo = Process.GetCurrentProcess().StartInfo;
+                StartInfo.FileName = Process.GetCurrentProcess().MainModule.FileName;
+                Process.Start(StartInfo);
+
+                System.IO.File.AppendAllText("UnhandledExceptions.txt", e.ExceptionObject.ToString());
+
+                ShutdownRequested = true;
+                Thread.Sleep(int.MaxValue);
+            };
 
             ShutdownCode = new Random().Next(0, 9999).ToString().PadLeft(4, '0');
             Log($"Fully functional - Shutdown code is {ShutdownCode}");

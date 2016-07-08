@@ -8,7 +8,7 @@ namespace Mirai.Commands
     {
         private static Dictionary<string, Command[]> Categories = new Dictionary<string, Command[]>();
 
-        internal static async void Parse(ReceivedMessage Message)
+        internal static async Task Parse(ReceivedMessage Message)
         {
             if (Message.Command == "shutdown" && Message.Text == Bot.ShutdownCode)
             {
@@ -16,17 +16,19 @@ namespace Mirai.Commands
                 return;
             }
 
+            var FullText = $"/{Message.Command} {Message.Text}".ToLower();
             foreach (var Category in Categories)
             {
-                if (Category.Key == "" || (Message.Feed.FeedInfo?.IsEnabled(Category.Key) ?? false))
+                if (Category.Key == string.Empty || (Message.Feed.FeedInfo?.IsEnabled(Category.Key) ?? false))
                 {
                     if (Message.Command != null)
                     {
+                        Message.Command = Message.Command.ToLower();
                         foreach (var Command in Category.Value)
                         {
-                            if (Command.Prefix == CommandType.Command && Command.Keys.Contains(Message.Command.ToLower()))
+                            if (Command.Prefix == CommandType.Command && Command.Keys.Contains(Message.Command))
                             {
-                                Command.Handler(Message);
+                                await Command.Handler(Message);
                                 return;
                             }
                         }
@@ -34,9 +36,10 @@ namespace Mirai.Commands
 
                     foreach (var Command in Category.Value)
                     {
-                        if (Command.Prefix == CommandType.Text && Command.Keys.All(Key => Message.Text.ToLower().Contains(Key)))
+                        if (Command.Prefix == CommandType.Text && Command.Keys.All(Key => FullText.Contains(Key)))
                         {
-                            Command.Handler(Message);
+                            Message.Text = FullText;
+                            await Command.Handler(Message);
                             return;
                         }
                     }
@@ -74,20 +77,14 @@ namespace Mirai.Commands
                         }
                         else
                         {
-                            CategoryCommands += $"_{string.Join(" and ", Command.Keys)}_";
-                            if (Command.Description != string.Empty)
-                            {
-                                CategoryCommands += $"~ `{Command.Description}`";
-                            }
-
-                            CategoryCommands += "\n";
+                            CategoryCommands += $"{string.Join(" _and_ ", Command.Keys)}\n";
                         }
                     }
 
                     if (CategoryCommands != string.Empty)
                     {
                         await Message.Respond($"{(Category.Key == string.Empty ? "**Main**" : "**" + Category.Key + "**")}\n{CategoryCommands}");
-                        await Task.Delay(200);
+                        await Task.Delay(100);
                     }
                 }
                 else
@@ -98,7 +95,7 @@ namespace Mirai.Commands
 
             if (Disabled.Count > 0)
             {
-                await Message.Respond($"**Disabled**\n {string.Join(", ", Disabled)}");
+                await Message.Respond($"**Disabled**\n{string.Join(", ", Disabled)}");
             }
         }
 
@@ -126,11 +123,9 @@ namespace Mirai.Commands
                 new Command(CommandType.Command, "minrank", "Sets a necessary rank to use a command", Administration.MinRank),
                 new Command(CommandType.Command, new [] { "giverank", "setrank" }, "Sets someone's rank", Administration.GiveRank),
                 new Command(CommandType.Command, new [] { "rank", "myrank" }, "See your rank in this server", Administration.Rank),
-                /*new Command(CommandType.Command, new [] { "sleep", "shutdown" }, "Shuts me down", Administration.Sleep),
-                new Command(CommandType.Command, "setname", "Changes my name", Administration.SetName),
+                /*new Command(CommandType.Command, "setname", "Changes my name", Administration.SetName),
                 new Command(CommandType.Command, "setavatar", "Changes my avatar", Administration.SetAvatar),
                 new Command(CommandType.Command, "prune", "Removes some message history", Administration.Prune),
-                new Command(CommandType.Command, "fix", "Clears the message queue", Administration.Fix),
                 new Command(CommandType.Command, "eval", "Runs a script", Administration.Eval),
                 new Command(CommandType.Command, "joinserver", "Sends the invite link to add me", Administration.JoinServer),
                 new Command(CommandType.Command, "leaveserver", "Leaves this server, add my mention to confirm", Administration.LeaveServer)*/
@@ -167,9 +162,9 @@ namespace Mirai.Commands
                 new Command(CommandType.Command, "manga", "Search for a manga - shorthand <name>", Search.MangaInfo)
             });*/
 
-            /*Categories.Add(typeof(Lewd).Name, new [] {
-                new Command(CommandType.Command, new string[] { "lewd", "booru", "nsfw" }, "Search for a lewd image", Lewd.RandomLewd)
-            });*/
+            Categories.Add(typeof(Lewd).Name, new [] {
+                new Command(CommandType.Command, new [] { "lewd", "booru", "nsfw" }, "Search for a lewd image", Lewd.Search)
+            });
 
             string Spam = "O - oooooooooo AAAAE - A - A - I - A - U - JO - oooooooooooo AAE - O - A - A - U - U - A - E - eee - ee - eee AAAAE - A - E - I - E - A - JO - ooo - oo - oo - oo EEEEO - A - AAA - AAAA";
             string FullSpam = "";

@@ -23,7 +23,7 @@ namespace Mirai.Commands
         }
 
         internal Command(CommandType Prefix, string[] Keys, string Description, string Response)
-            : this(Prefix, Keys, Description, async (Message) =>
+            : this(Prefix, Keys, Description, async delegate (ReceivedMessage Message)
             {
                 await Message.Respond(Response);
             })
@@ -44,7 +44,7 @@ namespace Mirai.Commands
             {
                 if (Message.SenderRank() >= MinRank(Message.Feed.Id))
                 {
-                    Handler(Message);
+                    await Handler(Message);
                 }
             };
         }

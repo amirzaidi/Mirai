@@ -7,5 +7,6 @@ namespace Mirai.Client
         public string Id;
         public string Name;
         public Type Type;
+        public string Join;
     }
 }

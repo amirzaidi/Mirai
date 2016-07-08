@@ -1,4 +1,5 @@
-﻿using Mirai.Database.Tables;
+﻿using Mirai.Commands;
+using Mirai.Database.Tables;
 using Mirai.Handlers;
 using System;
 using System.Collections.Concurrent;
@@ -53,12 +54,20 @@ namespace Mirai.Client
 
         public async Task Disconnect()
         {
-            Client.StopReceiving();
+            if (Client != null)
+            {
+                Client.StopReceiving();
+            }
         }
 
         public async Task Send(SendMessage Message)
         {
-            var Text = Message.Text.Replace("**", "*").Replace("__", "_");
+            var Text = Message.Text;
+            if (Message.Markdown)
+            {
+                Text = Text.Replace("**", "*").Replace("__", "_");
+            }
+
             Message.Text = null;
 
             try
@@ -74,9 +83,7 @@ namespace Mirai.Client
                         {
                             try
                             {
-                                //await Client.EditInlineMessageCaptionAsync(InlineId, "Response");
-                                await Client.EditInlineMessageTextAsync(InlineId, Text, ParseMode.Markdown);
-                                //await Client.EditInlineMessageReplyMarkupAsync(InlineId, null);
+                                await Client.EditInlineMessageTextAsync(InlineId, Text, Message.Markdown ? ParseMode.Markdown : ParseMode.Default);
                             }
                             catch (Exception Ex)
                             {
@@ -92,7 +99,9 @@ namespace Mirai.Client
                     Bot.Log("Could not find InlineId");
                 }
 
-                if (!Sent.TryAdd(Message, await Client.SendTextMessageAsync(long.Parse(Message.Chat), Text, parseMode: ParseMode.Markdown)))
+                var ReplyId = 0;
+                int.TryParse(Message.ReplyId, out ReplyId);
+                if (!Sent.TryAdd(Message, await Client.SendTextMessageAsync(long.Parse(Message.Chat), Text, replyToMessageId: ReplyId, parseMode: Message.Markdown ? ParseMode.Markdown : ParseMode.Default)))
                 {
                     Bot.Log("Failed to add message to the telegram sent list");
                 }
@@ -105,7 +114,12 @@ namespace Mirai.Client
 
         public async Task Edit(SendMessage Message)
         {
-            var Text = Message.Text.Replace("**", "*").Replace("__", "_");
+            var Text = Message.Text;
+            if (Message.Markdown)
+            {
+                Text = Text.Replace("**", "*").Replace("__", "_");
+            }
+
             Message.Text = null;
 
             TelegramMessage MessageObj;
@@ -139,35 +153,54 @@ namespace Mirai.Client
             {
                 Id = UserData.Id.ToString(),
                 Name = UserData.Username,
+                Join = $"@{UserData.Username}",
                 Type = typeof(Telegram)
             };
         }
+
+        private ConcurrentDictionary<long, TelegramFeedlink> FeedLinks = new ConcurrentDictionary<long, TelegramFeedlink>();
 
         public async Task UpdateCache()
         {
             Mention = $"@{(await Info()).Name}";
             //Add Feedlink Updates
+
+            FeedLinks.Clear();
+            using (var Context = Bot.GetDb)
+            {
+                foreach (var FeedLink in Context.TelegramFeedlink.Where(x => x.Token == Token))
+                {
+                    if (!FeedLinks.TryAdd(FeedLink.Chat, FeedLink))
+                    {
+                        Bot.Log("Can't add telegram feedlink");
+                    }
+                }
+            }
         }
 
         private async void OnMessage(object sender, MessageEventArgs e)
         {
             TelegramFeedlink FeedLink;
 
-            //Remove this query
-            using (var Context = Bot.GetDb)
-            {
-                FeedLink = Context.TelegramFeedlink.Where(x => x.Token == Token && x.Chat == e.Message.Chat.Id).FirstOrDefault();
-            }
-
             var Text = e.Message.Text;
-            if (Text == null)
-            {
-                return;
-            }
 
             byte JoinFeedId;
-            if (FeedLink != null)
+            if (FeedLinks.TryGetValue(e.Message.Chat.Id, out FeedLink))
             {
+                if (Text == null)
+                {
+                    if (e.Message.NewChatMember != null)
+                    {
+                        await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Welcome, @{e.Message.NewChatMember.Username}!", replyToMessageId: e.Message.MessageId);
+                    }
+                    else if (e.Message.LeftChatMember != null)
+                    {
+                        await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Bye, @{e.Message.LeftChatMember.Username}!", replyToMessageId: e.Message.MessageId);
+                    }
+
+                    return;
+                }
+
                 if (e.Message.From.Id.ToString() == Owner && Text == Bot.Command + Bot.LeaveFeed + Mention)
                 {
                     using (var Context = Bot.GetDb)
@@ -181,15 +214,16 @@ namespace Mirai.Client
                     Bot.Log($"Removed feed from {e.Message.Chat.Title} on {Mention}");
                     return;
                 }
-
+                
                 var Message = new ReceivedMessage
                 {
+                    Feed = Bot.Feeds[FeedLink.Feed],
                     Origin = new Destination
                     {
                         Token = Token,
                         Chat = e.Message.Chat.Id.ToString()
                     },
-                    Id = e.Message.MessageId,
+                    MessageId = e.Message.MessageId.ToString(),
                     Sender = e.Message.From.Id.ToString(),
                     SenderMention = $"@{e.Message.From.Username}",
                     Text = e.Message.Text,
@@ -197,8 +231,7 @@ namespace Mirai.Client
                     {
                         Id = x.User.Id.ToString(),
                         Mention = $"@{x.User.Username}"
-                    }).ToArray(),
-                    State = null
+                    }).ToArray()
                 };
 
                 var Trimmed = string.Empty;
@@ -230,13 +263,13 @@ namespace Mirai.Client
                     }
                 }
 
-                Bot.Feeds[FeedLink.Feed].Handle(Message);
+                await Parser.Parse(Message);
             }
             else if (e.Message.From.Id.ToString() == Owner)
             {
                 var JoinFeed = Bot.Command + Bot.JoinFeed + Mention + " ";
 
-                if (Text.StartsWith(JoinFeed) && byte.TryParse(Text.Substring(JoinFeed), out JoinFeedId) && JoinFeedId < Bot.Feeds.Length)
+                if (Text != null && Text.StartsWith(JoinFeed) && byte.TryParse(Text.Substring(JoinFeed), out JoinFeedId) && JoinFeedId < Bot.Feeds.Length)
                 {
                     using (var Context = Bot.GetDb)
                     {
@@ -281,7 +314,7 @@ namespace Mirai.Client
                         Result.Url = Result.ThumbUrl;
                         Result.InputMessageContent = new InputTextMessageContent();
                         ((InputTextMessageContent)Result.InputMessageContent).MessageText = $"/remove{Mention} [{MsgId}] {i}";
-                        Result.ReplyMarkup = IKM("Loading..", "http://www.google.nl", "/");
+                        Result.ReplyMarkup = IKM("Loading..", "", "/");
 
                         Results.Add(Result);
                     }
@@ -301,7 +334,7 @@ namespace Mirai.Client
                             Result.Url = Result.ThumbUrl;
                             Result.InputMessageContent = new InputTextMessageContent();
                             ((InputTextMessageContent)Result.InputMessageContent).MessageText = $"/{Key}{Mention} [{MsgId}]";
-                            Result.ReplyMarkup = IKM("Loading..", "http://www.google.com", "/");
+                            Result.ReplyMarkup = IKM("Loading..", "", "/");
 
                             Results.Add(Result);
                         }
@@ -388,7 +421,7 @@ namespace Mirai.Client
             var Markup = new InlineKeyboardMarkup();
             Markup.InlineKeyboard = new InlineKeyboardButton[][] { new InlineKeyboardButton[] { new InlineKeyboardButton() } };
             Markup.InlineKeyboard[0][0].Text = Text;
-            Markup.InlineKeyboard[0][0].Url = Url;
+            //Markup.InlineKeyboard[0][0].Url = Url;
             Markup.InlineKeyboard[0][0].CallbackData = CallbackData;
             return Markup;
         }

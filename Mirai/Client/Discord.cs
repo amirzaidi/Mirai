@@ -6,7 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using Discord.Audio;
-using System.Collections.Generic;
+using Mirai.Commands;
 
 namespace Mirai.Client
 {
@@ -51,6 +51,8 @@ namespace Mirai.Client
                 await UpdateCache();
 
                 Client.MessageReceived += MessageReceived;
+                Client.UserJoined += UserJoined;
+                Client.UserLeft += UserLeft;
             }
             catch (Exception Ex)
             {
@@ -108,6 +110,7 @@ namespace Mirai.Client
             }
         }
 
+        private static bool SendAudio = false;
         public async Task Stream(string Chat, byte[] Sound)
         {
             var ChatId = ulong.Parse(Chat);
@@ -125,20 +128,17 @@ namespace Mirai.Client
 
                 IAudioClient Old;
                 AudioClients.TryRemove(ChatId, out Old);
-                if (!AudioClients.TryAdd(ChatId, AudioClient))
+                if (AudioClients.TryAdd(ChatId, AudioClient))
                 {
-                    //Bot.Log("Failed to add audio client to the Audioclient list");
-                    await Task.Delay(100);
-                    return;
+                    SendAudio = false;
+                    Task.Delay(750).ContinueWith(delegate { SendAudio = true; });
                 }
             }
-
-            if (AudioClient.State != ConnectionState.Connected)
+            else if (AudioClient.State != ConnectionState.Connected)
             {
                 await AudioClient.Join(AudioClient.Channel);
             }
-
-            if (Sound != null)
+            else if (Sound != null && SendAudio)
             {
                 try
                 {
@@ -158,32 +158,40 @@ namespace Mirai.Client
             {
                 Id = Client.CurrentUser.Id.ToString(),
                 Name = Client.CurrentUser.Name,
+                Join = $"https://discordapp.com/oauth2/authorize?&client_id={App}&scope=bot",
                 Type = typeof(Discord)
             };
         }
 
+        private ConcurrentDictionary<string, DiscordFeedlink> FeedLinks = new ConcurrentDictionary<string, DiscordFeedlink>();
+
         public async Task UpdateCache()
         {
             Mention = $"<@{Client.CurrentUser.Id}>";
-            //Add Cached Feedlist
+
+            FeedLinks.Clear();
+            using (var Context = Bot.GetDb)
+            {
+                foreach (var FeedLink in Context.DiscordFeedlink.Where(x => x.Token == Token))
+                {
+                    if (!FeedLinks.TryAdd(FeedLink.TextChannel, FeedLink))
+                    {
+                        Bot.Log("Can't add discord feedlink");
+                    }
+                }
+            }
         }
 
         private async void MessageReceived(object sender, MessageEventArgs e)
         {
             if (!e.User.IsBot && e.Message.Text != string.Empty)
             {
-                string TextChannel = e.Channel.Id.ToString();
+                var TextChannel = e.Channel.Id.ToString();
                 DiscordFeedlink FeedLink;
 
-                //Remove this query
-                using (var Context = Bot.GetDb)
-                {
-                    FeedLink = Context.DiscordFeedlink.Where(x => x.Token == Token && x.TextChannel == TextChannel).FirstOrDefault();
-                }
-
-                string RawText = e.Message.RawText;
+                var RawText = e.Message.RawText;
                 byte JoinFeedId;
-                if (FeedLink != null)
+                if (FeedLinks.TryGetValue(TextChannel, out FeedLink))
                 {
                     if (e.User.Id.ToString() == Owner)
                     {
@@ -199,6 +207,15 @@ namespace Mirai.Client
                             Bot.UpdateCache();
                             Bot.Log($"Removed feed from {e.Channel.Name} on {Mention}");
                             return;
+                        }
+                        //Start Discord-specific commands
+                        else if (RawText.StartsWith(Mention + " changename"))
+                        {
+                            var Name = RawText.Substring(Mention + " changename").Trim();
+                            if (Name.Length != 0)
+                            {
+                                await Client.CurrentUser.Edit(username: Name);
+                            }
                         }
                         else if (RawText == Mention + " setaudio")
                         {
@@ -234,12 +251,13 @@ namespace Mirai.Client
 
                     var Message = new ReceivedMessage
                     {
+                        Feed = Bot.Feeds[FeedLink.Feed],
                         Origin = new Destination
                         {
                             Token = Token,
                             Chat = e.Channel.Id.ToString()
                         },
-                        Id = e.User.Id,
+                        MessageId = e.Message.Id.ToString(),
                         Sender = e.User.Id.ToString(),
                         SenderMention = $"<@{e.User.Id}>",
                         Text = RawText,
@@ -247,8 +265,7 @@ namespace Mirai.Client
                         {
                             Id = x.Id.ToString(),
                             Mention = $"<@{x.Id}>"
-                        }).ToArray(),
-                        State = null
+                        }).ToArray()
                     };
 
                     var Trimmed = string.Empty;
@@ -267,7 +284,7 @@ namespace Mirai.Client
                         Message.Text = Trimmed.Substring(Message.Command).TrimStart();
                     }
                     
-                    Bot.Feeds[FeedLink.Feed].Handle(Message);
+                    await Parser.Parse(Message);
                 }
                 else if (e.User.Id.ToString() == Owner)
                 {
@@ -290,6 +307,22 @@ namespace Mirai.Client
                         Bot.Log($"Added feed to {e.Channel.Name} on {Mention}");
                     }
                 }
+            }
+        }
+
+        private async void UserJoined(object sender, UserEventArgs e)
+        {
+            foreach (var TextChannel in e.Server.TextChannels.Where(x => FeedLinks.Values.Any(y => y.TextChannel == x.Id.ToString())))
+            {
+                await TextChannel.SendMessage($"Welcome, {e.User.Mention}!");
+            }
+        }
+
+        private async void UserLeft(object sender, UserEventArgs e)
+        {
+            foreach (var TextChannel in e.Server.TextChannels.Where(x => FeedLinks.Values.Any(y => y.TextChannel == x.Id.ToString())))
+            {
+                await TextChannel.SendMessage($"Bye, {e.User.Name}!");
             }
         }
     }

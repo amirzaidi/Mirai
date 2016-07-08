@@ -1,4 +1,5 @@
 ﻿using Mirai.Database.Tables;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,7 +23,7 @@ namespace Mirai.Handlers
 
         private byte[] CurrentSend = null;
         private byte[] NextSend = null;
-        private Queue<Task> Sending = new Queue<Task>(3);
+        private Queue<Task> Sending = new Queue<Task>();
 
         private string PlayingMessage
         {
@@ -109,7 +110,7 @@ namespace Mirai.Handlers
             else
             {
                 Feed.Delete(PlayingMessageId, Destination);
-                Feed.Send(Destination, PlayingMessage, PlayingMessageId);
+                Feed.Send(Destination, PlayingMessage, Id: PlayingMessageId);
             }
         }
 
@@ -122,6 +123,7 @@ namespace Mirai.Handlers
                     Playing.Dispose();
                     Playing = null;
                     await UpdateAll();
+                    await Task.Delay(50);
                 }
 
                 if (Playing == null)
@@ -138,7 +140,7 @@ namespace Mirai.Handlers
                 {
                     if (NextSend != null)
                     {
-                        if (Sending.Count == 3)
+                        while (Sending.Count > 2)
                         {
                             await Sending.Dequeue();
                         }
@@ -279,23 +281,22 @@ namespace Mirai.Handlers
             {
                 Context.Song.RemoveRange(Context.Song.Where(x => x.Feed == Feed.Id));
 
-                var Queue = this.Queue.ToArray();
-                var Songs = new Song[Queue.Length + 1];
-                Songs[0] = new Song
+                var i = 1;
+                var Songs = Queue.Select(x => new Song
                 {
                     Feed = Feed.Id,
-                    Place = 0,
-                    Query = Playing.Song.Query
-                };
+                    Place = i++,
+                    Query = x.Query
+                }).ToList();
 
-                for (int i = 0; i < Queue.Length; i++)
+                if (Playing != null)
                 {
-                    Songs[i + 1] = new Song
+                    Songs.Insert(0, new Song
                     {
                         Feed = Feed.Id,
-                        Place = i + 1,
-                        Query = Queue[i].Query
-                    };
+                        Place = 0,
+                        Query = Playing.Song.Query
+                    });
                 }
 
                 Context.Song.AddRange(Songs);

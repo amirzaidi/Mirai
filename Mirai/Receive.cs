@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using System.Threading.Tasks;
 
 namespace Mirai
@@ -15,7 +13,7 @@ namespace Mirai
     {
         internal FeedContext Feed;
         internal Destination Origin;
-        internal object Id;
+        internal string MessageId;
         internal string Sender;
         internal string SenderMention;
         internal string Command;
@@ -30,9 +28,9 @@ namespace Mirai
             }
         }
 
-        internal async Task Respond(string Text)
+        internal async Task Respond(string Text, bool Markdown = true)
         {
-            Feed.Send(Origin, Text, State: State);
+            Feed.Send(Origin, Text, Markdown, State, ReplyId: MessageId);
         }
 
         internal byte SenderRank()
