@@ -117,7 +117,7 @@ namespace Mirai
                 Thread.Sleep(int.MaxValue);
             };
 
-            ShutdownCode = new Random().Next(0, 9999).ToString().PadLeft(4, '0');
+            ShutdownCode = new Random().Next(0, 999999).ToString().PadLeft(6, '0');
             Log($"Fully functional - Shutdown code is {ShutdownCode}");
         }
 

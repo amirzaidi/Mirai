@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -90,7 +92,7 @@ namespace Mirai.Commands
                 }
                 else
                 {
-                    foreach (var File in ToAdd)
+                    foreach (var File in ToAdd.ToArray())
                     {
                         if (await Message.Feed.Music.AddSong(File, File, false) == 0)
                         {
@@ -145,6 +147,21 @@ namespace Mirai.Commands
             {
                 Message.Respond($"Currently, no song is playing");
             }
+        }
+
+        internal static async Task Clear(ReceivedMessage Message)
+        {
+            Message.Feed.Music.Queue = new ConcurrentQueue<Handlers.TitledQuery>();
+            Message.Respond($"The queue has been cleared");
+            Message.Feed.Music.UpdateAll();
+        }
+
+        internal static async Task Shuffle(ReceivedMessage Message)
+        {
+            var Rand = new Random();
+            Message.Feed.Music.Queue = new ConcurrentQueue<Handlers.TitledQuery>(Message.Feed.Music.Queue.OrderBy(x => Rand.Next()));
+            Message.Respond($"The queue has been shuffled");
+            Message.Feed.Music.UpdateAll();
         }
 
         internal static async Task Remove(ReceivedMessage Message)

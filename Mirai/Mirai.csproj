@@ -83,6 +83,10 @@
       <HintPath>..\packages\Google.Apis.YouTube.v3.1.14.0.529\lib\portable-net45+netcore45+wpa81+wp8\Google.Apis.YouTube.v3.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Imgur.API, Version=4.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Imgur.API.4.0.0-beta1\lib\net45\Imgur.API.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="libvideo">
       <HintPath>..\..\DiscordBot\libvideo\bin\Debug\libvideo.dll</HintPath>
     </Reference>

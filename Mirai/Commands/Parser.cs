@@ -123,26 +123,20 @@ namespace Mirai.Commands
                 new Command(CommandType.Command, "minrank", "Sets a necessary rank to use a command", Administration.MinRank),
                 new Command(CommandType.Command, new [] { "giverank", "setrank" }, "Sets someone's rank", Administration.GiveRank),
                 new Command(CommandType.Command, new [] { "rank", "myrank" }, "See your rank in this server", Administration.Rank),
-                /*new Command(CommandType.Command, "setname", "Changes my name", Administration.SetName),
-                new Command(CommandType.Command, "setavatar", "Changes my avatar", Administration.SetAvatar),
-                new Command(CommandType.Command, "prune", "Removes some message history", Administration.Prune),
-                new Command(CommandType.Command, "eval", "Runs a script", Administration.Eval),
-                new Command(CommandType.Command, "joinserver", "Sends the invite link to add me", Administration.JoinServer),
-                new Command(CommandType.Command, "leaveserver", "Leaves this server, add my mention to confirm", Administration.LeaveServer)*/
+                new Command(CommandType.Command, new [] { "id", "myid" }, "See your personal id", Administration.Id),
+                //new Command(CommandType.Command, "eval", "Runs a script", Administration.Eval)
             });
 
             Categories.Add(typeof(Audio).Name, new[] {
-                //new Command(CommandType.Command, "join", "Joins your current voice channel", Audio.Join),
-                //new Command(CommandType.Command, "leave", "Leaves any voice channel", Audio.Leave),
-                new Command(CommandType.Command, new string[] { "add", "q" }, "Adds a song title to the music queue", Audio.Add),
-                new Command(CommandType.Command, new string[] { "local", "addlocal", "l" }, "Adds a local song title to the music queue", Audio.Local),
-                new Command(CommandType.Command, new string[] { "push", "p" }, "Pushes a song to the top of the music queue", Audio.Push),
-                new Command(CommandType.Command, new string[] { "repeat" }, "Repeats the currently playing song", Audio.Repeat),
-                new Command(CommandType.Command, new string[] { "remove", "r" }, "Removes a song from the music queue", Audio.Remove),
-                new Command(CommandType.Command, new string[] { "playing", "song", "np", "playlist", "lq", "queue" }, "Shows the current song and playlist", Audio.Playing),
-                new Command(CommandType.Command, new string[] { "skip", "next", "n" }, "Skips the current song", Audio.Skip),
-                //new Command(CommandType.Command, new string[] { "shuffle", "s" }, "Shuffles the current queue", Audio.Shuffle),
-                //new Command(CommandType.Command, "clear", "Clears the current queue", Audio.Clear)
+                new Command(CommandType.Command, new [] { "add", "q" }, "Adds a song title to the music queue", Audio.Add),
+                new Command(CommandType.Command, new [] { "local", "addlocal", "l" }, "Adds a local song title to the music queue", Audio.Local),
+                new Command(CommandType.Command, new [] { "push", "p" }, "Pushes a song to the top of the music queue", Audio.Push),
+                new Command(CommandType.Command, new [] { "repeat" }, "Repeats the currently playing song", Audio.Repeat),
+                new Command(CommandType.Command, new [] { "remove", "r" }, "Removes a song from the music queue", Audio.Remove),
+                new Command(CommandType.Command, new [] { "playing", "song", "np", "playlist", "lq", "queue" }, "Shows the current song and playlist", Audio.Playing),
+                new Command(CommandType.Command, new [] { "skip", "next", "n" }, "Skips the current song", Audio.Skip),
+                new Command(CommandType.Command, new [] { "shuffle", "s" }, "Shuffles the current queue", Audio.Shuffle),
+                new Command(CommandType.Command, "clear", "Clears the current queue", Audio.Clear)
             });
 
             /*Categories.Add(typeof(Trivia).Name, new [] {
@@ -151,16 +145,18 @@ namespace Mirai.Commands
                 new Command(CommandType.Command, new string[] { "stoptrivia", "tq" }, "Stops a trivia match in your channel", Trivia.Stop)
             });*/
 
-            /*Categories.Add(typeof(Search).Name, new [] {
-                new Command(CommandType.Command, new string[] { "ask", "8ball" }, "Ask me a question", Search.Ask),
+            Categories.Add(typeof(Search).Name, new [] {
+                /*new Command(CommandType.Command, new string[] { "ask", "8ball", "answer" }, "Ask me a question", Search.Ask),
                 new Command(CommandType.Command, new string[] { "youtube", "yt" }, "Searches for a youtube video", Search.Youtube),
-                new Command(CommandType.Command, new string[] { "image", "img" }, "Search for an image", Search.Image),
+                new Command(CommandType.Command, new string[] { "image", "img" }, "Search for an image", Search.Image),*/
                 new Command(CommandType.Command, "osu", "Show someone's osu stats", Search.Osu),
-                new Command(CommandType.Command, new string[] { "avatar", "av" }, "Show someone's avatar", Search.Avatar),
-                new Command(CommandType.Command, new string[] { "define", "ud" }, "Search for a term", Search.Define),
-                new Command(CommandType.Command, "anime", "Search for an anime - shorthand {name}", Search.AnimeInfo),
-                new Command(CommandType.Command, "manga", "Search for a manga - shorthand <name>", Search.MangaInfo)
-            });*/
+                //new Command(CommandType.Command, new string[] { "avatar", "av" }, "Show someone's avatar", Search.Avatar),
+                new Command(CommandType.Command, new [] { "define", "ud", "what's", "whats", "who's", "whos" }, "Search for a term", Search.Define),
+                new Command(CommandType.Command, "anime", "Search for an anime - shorthand {name}", Search.Anime),
+                new Command(CommandType.Command, "manga", "Search for a manga - shorthand <name>", Search.Manga),
+                new Command(CommandType.Text, new [] { "{", "}" }, "Search for an anime", Search.AnimeShort),
+                new Command(CommandType.Text, new [] { "<", ">" }, "Search for a manga", Search.MangaShort)
+            });
 
             Categories.Add(typeof(Lewd).Name, new [] {
                 new Command(CommandType.Command, new [] { "lewd", "booru", "nsfw" }, "Search for a lewd image", Lewd.Search)
@@ -176,37 +172,28 @@ namespace Mirai.Commands
 
             Categories.Add(typeof(Conversation).Name, new[] {
                 new Command(CommandType.Command, new [] { "hi", "hey", "hello" }, "Say hello to me", "Hi!"),
-                /*new Command(CommandType.Command, "choose from", "Choose from a list", Conversation.Choose),
-                new Command(CommandType.Command, "how are you", "Check if my owner is online", Conversation.Status),
-                new Command(CommandType.Command, new string[] { "do you like me", "do you love me" }, "...", Conversation.Love),
-                new Command(CommandType.Command, new string[] { "insult", "hate on" }, "Insult a person", Conversation.Insult),
-                new Command(CommandType.Command, new string[] { "praise", "compliment" }, "Praise a person", Conversation.Praise),
-                new Command(CommandType.Command, new string[] { "attack", "stab" }, "Stab a person", Conversation.Stab),
-                new Command(CommandType.Command, new string[] { "welcome", "say hi to" }, "Welcome someone", Conversation.Hi),
+                new Command(CommandType.Command, "choose", "Choose from a list", Conversation.Choose),
+                /*new Command(CommandType.Command, "how are you", "Check if my owner is online", Conversation.Status),
+                new Command(CommandType.Command, new string[] { "do you like me", "do you love me" }, "...", Conversation.Love),*/
+                new Command(CommandType.Command, new string[] { "insult", "flame" }, "Insult a person", Conversation.Insult),
+                //new Command(CommandType.Command, new string[] { "praise", "compliment" }, "Praise a person", Conversation.Praise),
+                new Command(CommandType.Command, new string[] { "attack", "stab" }, "Attack a person", Conversation.Stab),
+                /*new Command(CommandType.Command, new string[] { "welcome", "say hi to" }, "Welcome someone", Conversation.Hi),
                 new Command(CommandType.Command, "say bye to", "Say bye to someone", Conversation.Bye),
                 new Command(CommandType.Command, new string[] { "go out with me", "will you go out with me" }, "...", Conversation.GoOut),
                 new Command(CommandType.Command, new string[] { "you're best girl", "you are best girl" }, "Compliment me", Conversation.Best),
-                new Command(CommandType.Command, new string[] { "you're not best girl", "you are not best girl", "cry" }, "Don't be heartless", Conversation.Cry),
-                new Command(CommandType.Command, new string[] { "take it", "take this", "here" }, "Give me a reward", Conversation.TakeIt),
-                new Command(CommandType.Command, new string[] { "no bully", "stop bully" }, "Tell me to enforce a no bully zone", Conversation.NoBully),
+                new Command(CommandType.Command, new string[] { "you're not best girl", "you are not best girl", "cry" }, "Don't be heartless", Conversation.Cry),*/
+                new Command(CommandType.Command, new [] { "here", "reward" }, "Give me a reward", Conversation.Reward),
+                //new Command(CommandType.Command, new string[] { "no bully", "stop bully" }, "Tell me to enforce a no bully zone", Conversation.NoBully),
                 new Command(CommandType.Command, "sing", "Ask me to sing", Conversation.Sing),
                 new Command(CommandType.Command, "dance", "Ask me to dance", Conversation.Dance),
-                new Command(CommandType.Command, new string[] { "good night", "bye" }, "Say good night to me", Conversation.GoodNight),
-                new Command(CommandType.Command, new string[] { "watch out", "trip", "stop" }, "Will make me trip", Conversation.Trip),
-                new Command(CommandType.Command, new string[] { "you're weird", "you are weird" }, "Make me sad", Conversation.Weird),
-                new Command(CommandType.Command, new string[] { "you're cute", "you are cute" }, "Make me happy", Conversation.Cute),
-                new Command(CommandType.Command, new string[] { "do you even lewd", "try to be lewd" }, "Send semi-lewd pictures", Conversation.Lewd),
-                new Command(CommandType.Command, new string[] { "what's", "what is", "who's", "who is" }, "Search for a term", Search.Define),
-                new Command(CommandType.Command, new string[] { "what are", "what're" }, "Search for a plural term", Search.DefineSimple),
-                new Command(CommandType.Mention, "shitpost", "Send a shitpost", Conversation.Shitpost),
-                new Command(CommandType.Mention, new string[] { "send oc", "stealie" }, "Stealie a mealie", Conversation.Dogman),
-                new Command(CommandType.Command, "meme", "Memeify a text", Conversation.Meme),*/
+                new Command(CommandType.Command, new [] { "meme", "dank", "dankmeme", "animeme" }, "Get a dank meme", Conversation.Meme),
 
                 new Command(CommandType.Text, "megane", "", "Fuyukai desu!"),
                 new Command(CommandType.Text, "burn the chat", "", "🔥 ด้้้้้็็็็็้้้้้็็็็็้้้้้้้้็็็็็้้้้้็็ด้้้้้็็็็็้้้้้็็็็็้้้้้้้้็็็็็้้้้้็็็็็้้้้้้้้็็็ด้้้้้็็็็็้้้้้็็็็็้้้้้้้้็็็็็้้้้้็็็็็้้้้ 🔥"),
                 new Command(CommandType.Text, "kuriyama?", "", "Yes?"),
                 new Command(CommandType.Text, "mirai?", "", "Please call me Kuriyama"),
-                //new Command(CommandType.None, new string[] { "fuck mirai", "fuck you mirai" }, "", Conversation.Cry),
+                //new Command(CommandType.None, new [] { "fuck mirai", "fuck you mirai" }, "", Conversation.Cry),
 
                 new Command(CommandType.Text, new [] { "aaaae", "o-ooo" }, "", "**" + FullSpam + "**"),
                 new Command(CommandType.Text, "fap", "", "ಠ.ಠ"),

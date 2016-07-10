@@ -9,6 +9,16 @@ namespace Mirai
 {
     static class Extentions
     {
+        public static string MaxSubstring(this string Source, int MaxLength, string Add = "")
+        {
+            if (Source.Length < MaxLength)
+            {
+                return Source;
+            }
+
+            return Source.Substring(0, MaxLength - Add.Length) + Add;
+        }
+
         public static string Substring(this string Source, string Trim)
         {
             return Source.Substring(Trim.Length);

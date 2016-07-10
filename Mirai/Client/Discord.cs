@@ -45,14 +45,28 @@ namespace Mirai.Client
 
         public async Task Connect()
         {
+            Client.MessageReceived += MessageReceived;
+            Client.UserJoined += UserJoined;
+            Client.UserLeft += UserLeft;
+            Client.Log.Message += delegate (object sender, LogMessageEventArgs e)
+            {
+                var Text = $"{e.Severity} ";
+                if (e.Message != null)
+                    Text += $"Message {e.Message}";
+
+                if (e.Exception != null)
+                    Text += $"\nException {e.Exception}";
+
+                if (e.Source != null)
+                    Text += $" From {e.Source}";
+
+                Bot.Log(Text);
+            };
+
             try
             {
                 await Client.Connect(Token);
                 await UpdateCache();
-
-                Client.MessageReceived += MessageReceived;
-                Client.UserJoined += UserJoined;
-                Client.UserLeft += UserLeft;
             }
             catch (Exception Ex)
             {
@@ -78,9 +92,16 @@ namespace Mirai.Client
             var Channel = Client.Servers.SelectMany(x => x.TextChannels).Where(x => x.Id == ChatId).FirstOrDefault();
             if (Channel != null)
             {
-                string Text = Message.Text;
+                var Text = Message.Text;
                 Message.Text = null;
 
+                if (Text.Length > 2000)
+                {
+                    Text = $"{Text.Substring(0, 1997)}...";
+                }
+
+                DiscordMessage Old;
+                Sent.TryRemove(Message, out Old);
                 if (!Sent.TryAdd(Message, await Channel.SendMessage(Text)))
                 {
                     Bot.Log("Failed to add message to the discord sent list");
@@ -184,129 +205,136 @@ namespace Mirai.Client
 
         private async void MessageReceived(object sender, MessageEventArgs e)
         {
-            if (!e.User.IsBot && e.Message.Text != string.Empty)
+            try
             {
-                var TextChannel = e.Channel.Id.ToString();
-                DiscordFeedlink FeedLink;
-
-                var RawText = e.Message.RawText;
-                byte JoinFeedId;
-                if (FeedLinks.TryGetValue(TextChannel, out FeedLink))
+                if (!e.User.IsBot && e.Message.Text != string.Empty)
                 {
-                    if (e.User.Id.ToString() == Owner)
+                    var TextChannel = e.Channel.Id.ToString();
+                    DiscordFeedlink FeedLink;
+
+                    var RawText = e.Message.RawText;
+                    byte JoinFeedId;
+                    if (FeedLinks.TryGetValue(TextChannel, out FeedLink))
                     {
-                        if (RawText == Mention + " " + Bot.LeaveFeed)
+                        if (e.User.Id.ToString() == Owner)
+                        {
+                            if (RawText == Mention + " " + Bot.LeaveFeed)
+                            {
+                                using (var Context = Bot.GetDb)
+                                {
+                                    Context.DiscordFeedlink.Attach(FeedLink);
+                                    Context.DiscordFeedlink.Remove(FeedLink);
+                                    await Context.SaveChangesAsync();
+                                }
+
+                                Bot.UpdateCache();
+                                Bot.Log($"Removed feed from {e.Channel.Name} on {Mention}");
+                                return;
+                            }
+                            //Start Discord-specific commands
+                            else if (RawText.StartsWith(Mention + " changename"))
+                            {
+                                var Name = RawText.Substring(Mention + " changename").Trim();
+                                if (Name.Length != 0)
+                                {
+                                    await Client.CurrentUser.Edit(username: Name);
+                                }
+                            }
+                            else if (RawText == Mention + " setaudio")
+                            {
+                                var Success = false;
+                                var ServerVoiceChannelIds = e.Server.VoiceChannels.Select(y => y.Id.ToString()).ToList();
+                                var TextChannelId = e.Channel.Id.ToString();
+
+                                using (var Context = Bot.GetDb)
+                                {
+                                    if (!Context.DiscordFeedlink.Any(x => x.TextChannel != TextChannelId && ServerVoiceChannelIds.Contains(x.VoiceChannel)))
+                                    {
+                                        Context.DiscordFeedlink.Attach(FeedLink);
+                                        FeedLink.VoiceChannel = e.User.VoiceChannel?.Id.ToString();
+                                        await Context.SaveChangesAsync();
+                                        Success = true;
+
+                                    }
+                                }
+
+                                if (Success)
+                                {
+                                    Bot.UpdateCache();
+                                    Bot.Log($"Set audio to {e.User.VoiceChannel?.Name} on {Mention}");
+                                }
+                                else
+                                {
+                                    Bot.Log($"Can't set audio to {e.User.VoiceChannel?.Name} on {Mention}");
+                                }
+
+                                return;
+                            }
+                        }
+
+                        var Message = new ReceivedMessage
+                        {
+                            Feed = Bot.Feeds[FeedLink.Feed],
+                            Origin = new Destination
+                            {
+                                Token = Token,
+                                Chat = e.Channel.Id.ToString()
+                            },
+                            MessageId = e.Message.Id.ToString(),
+                            Sender = e.User.Id.ToString(),
+                            SenderMention = $"<@{e.User.Id}>",
+                            Text = RawText,
+                            Mentions = e.Message.MentionedUsers.Where(x => !x.IsBot).Select(x => new ReceivedMessageMention
+                            {
+                                Id = x.Id.ToString(),
+                                Mention = $"<@{x.Id}>"
+                            }).ToArray()
+                        };
+
+                        var Trimmed = string.Empty;
+                        if (Message.Text.StartsWith(Mention))
+                        {
+                            Trimmed = Message.Text.Substring(Mention).TrimStart();
+                        }
+                        else if (Message.Text.StartsWith(Bot.Command))
+                        {
+                            Trimmed = Message.Text.Substring(Bot.Command);
+                        }
+
+                        if (Trimmed != string.Empty)
+                        {
+                            Message.Command = Trimmed.Split(' ')[0];
+                            Message.Text = Trimmed.Substring(Message.Command).TrimStart();
+                        }
+
+                        await Parser.Parse(Message);
+                    }
+                    else if (e.User.Id.ToString() == Owner)
+                    {
+                        var JoinFeed = Mention + " " + Bot.JoinFeed + " ";
+                        if (RawText.StartsWith(JoinFeed) && byte.TryParse(RawText.Substring(JoinFeed), out JoinFeedId) && JoinFeedId < Bot.Feeds.Length)
                         {
                             using (var Context = Bot.GetDb)
                             {
-                                Context.DiscordFeedlink.Attach(FeedLink);
-                                Context.DiscordFeedlink.Remove(FeedLink);
+                                Context.DiscordFeedlink.Add(new DiscordFeedlink()
+                                {
+                                    Token = Token,
+                                    TextChannel = e.Channel.Id.ToString(),
+                                    Feed = JoinFeedId
+                                });
+
                                 await Context.SaveChangesAsync();
                             }
 
                             Bot.UpdateCache();
-                            Bot.Log($"Removed feed from {e.Channel.Name} on {Mention}");
-                            return;
+                            Bot.Log($"Added feed to {e.Channel.Name} on {Mention}");
                         }
-                        //Start Discord-specific commands
-                        else if (RawText.StartsWith(Mention + " changename"))
-                        {
-                            var Name = RawText.Substring(Mention + " changename").Trim();
-                            if (Name.Length != 0)
-                            {
-                                await Client.CurrentUser.Edit(username: Name);
-                            }
-                        }
-                        else if (RawText == Mention + " setaudio")
-                        {
-                            var Success = false;
-                            var ServerVoiceChannelIds = e.Server.VoiceChannels.Select(y => y.Id.ToString()).ToList();
-                            var TextChannelId = e.Channel.Id.ToString();
-
-                            using (var Context = Bot.GetDb)
-                            {
-                                if (!Context.DiscordFeedlink.Any(x => x.TextChannel != TextChannelId && ServerVoiceChannelIds.Contains(x.VoiceChannel)))
-                                {
-                                    Context.DiscordFeedlink.Attach(FeedLink);
-                                    FeedLink.VoiceChannel = e.User.VoiceChannel?.Id.ToString();
-                                    await Context.SaveChangesAsync();
-                                    Success = true;
-
-                                }
-                            }
-
-                            if (Success)
-                            {
-                                Bot.UpdateCache();
-                                Bot.Log($"Set audio to {e.User.VoiceChannel?.Name} on {Mention}");
-                            }
-                            else
-                            {
-                                Bot.Log($"Can't set audio to {e.User.VoiceChannel?.Name} on {Mention}");
-                            }
-
-                            return;
-                        }
-                    }
-
-                    var Message = new ReceivedMessage
-                    {
-                        Feed = Bot.Feeds[FeedLink.Feed],
-                        Origin = new Destination
-                        {
-                            Token = Token,
-                            Chat = e.Channel.Id.ToString()
-                        },
-                        MessageId = e.Message.Id.ToString(),
-                        Sender = e.User.Id.ToString(),
-                        SenderMention = $"<@{e.User.Id}>",
-                        Text = RawText,
-                        Mentions = e.Message.MentionedUsers.Where(x => !x.IsBot).Select(x => new ReceivedMessageMention
-                        {
-                            Id = x.Id.ToString(),
-                            Mention = $"<@{x.Id}>"
-                        }).ToArray()
-                    };
-
-                    var Trimmed = string.Empty;
-                    if (Message.Text.StartsWith(Mention))
-                    {
-                        Trimmed = Message.Text.Substring(Mention).TrimStart();
-                    }
-                    else if (Message.Text.StartsWith(Bot.Command))
-                    {
-                        Trimmed = Message.Text.Substring(Bot.Command);
-                    }
-
-                    if (Trimmed != string.Empty)
-                    {
-                        Message.Command = Trimmed.Split(' ')[0];
-                        Message.Text = Trimmed.Substring(Message.Command).TrimStart();
-                    }
-                    
-                    await Parser.Parse(Message);
-                }
-                else if (e.User.Id.ToString() == Owner)
-                {
-                    var JoinFeed = Mention + " " + Bot.JoinFeed + " ";
-                    if (RawText.StartsWith(JoinFeed) && byte.TryParse(RawText.Substring(JoinFeed), out JoinFeedId) && JoinFeedId < Bot.Feeds.Length)
-                    {
-                        using (var Context = Bot.GetDb)
-                        {
-                            Context.DiscordFeedlink.Add(new DiscordFeedlink()
-                            {
-                                Token = Token,
-                                TextChannel = e.Channel.Id.ToString(),
-                                Feed = JoinFeedId
-                            });
-
-                            await Context.SaveChangesAsync();
-                        }
-
-                        Bot.UpdateCache();
-                        Bot.Log($"Added feed to {e.Channel.Name} on {Mention}");
                     }
                 }
+            }
+            catch (Exception Ex)
+            {
+                Bot.Log(Ex);
             }
         }
 

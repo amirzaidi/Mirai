@@ -77,6 +77,11 @@ namespace Mirai.Commands
             await Message.Respond($"You are rank {Message.SenderRank()}");
         }
 
+        internal static async Task Id(ReceivedMessage Message)
+        {
+            await Message.Respond($"Your id is {Message.Sender}");
+        }
+
         internal static async Task Sleep(ReceivedMessage Message)
         {
         }

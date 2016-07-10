@@ -101,6 +101,9 @@ namespace Mirai.Client
 
                 var ReplyId = 0;
                 int.TryParse(Message.ReplyId, out ReplyId);
+
+                TelegramMessage Old;
+                Sent.TryRemove(Message, out Old);
                 if (!Sent.TryAdd(Message, await Client.SendTextMessageAsync(long.Parse(Message.Chat), Text, replyToMessageId: ReplyId, parseMode: Message.Markdown ? ParseMode.Markdown : ParseMode.Default)))
                 {
                     Bot.Log("Failed to add message to the telegram sent list");
@@ -180,112 +183,134 @@ namespace Mirai.Client
 
         private async void OnMessage(object sender, MessageEventArgs e)
         {
-            TelegramFeedlink FeedLink;
-
-            var Text = e.Message.Text;
-
-            byte JoinFeedId;
-            if (FeedLinks.TryGetValue(e.Message.Chat.Id, out FeedLink))
+            try
             {
-                if (Text == null)
+                TelegramFeedlink FeedLink;
+                var Text = e.Message.Text;
+
+                byte JoinFeedId;
+                if (FeedLinks.TryGetValue(e.Message.Chat.Id, out FeedLink))
                 {
-                    if (e.Message.NewChatMember != null)
+                    if (Text == null)
                     {
-                        await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Welcome, @{e.Message.NewChatMember.Username}!", replyToMessageId: e.Message.MessageId);
-                    }
-                    else if (e.Message.LeftChatMember != null)
-                    {
-                        await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Bye, @{e.Message.LeftChatMember.Username}!", replyToMessageId: e.Message.MessageId);
-                    }
-
-                    return;
-                }
-
-                if (e.Message.From.Id.ToString() == Owner && Text == Bot.Command + Bot.LeaveFeed + Mention)
-                {
-                    using (var Context = Bot.GetDb)
-                    {
-                        Context.TelegramFeedlink.Attach(FeedLink);
-                        Context.TelegramFeedlink.Remove(FeedLink);
-                        await Context.SaveChangesAsync();
-                    }
-
-                    Bot.UpdateCache();
-                    Bot.Log($"Removed feed from {e.Message.Chat.Title} on {Mention}");
-                    return;
-                }
-                
-                var Message = new ReceivedMessage
-                {
-                    Feed = Bot.Feeds[FeedLink.Feed],
-                    Origin = new Destination
-                    {
-                        Token = Token,
-                        Chat = e.Message.Chat.Id.ToString()
-                    },
-                    MessageId = e.Message.MessageId.ToString(),
-                    Sender = e.Message.From.Id.ToString(),
-                    SenderMention = $"@{e.Message.From.Username}",
-                    Text = e.Message.Text,
-                    Mentions = e.Message.Entities.Where(x => x.User != null).Select(x => new ReceivedMessageMention
-                    {
-                        Id = x.User.Id.ToString(),
-                        Mention = $"@{x.User.Username}"
-                    }).ToArray()
-                };
-
-                var Trimmed = string.Empty;
-                if (Message.Text.StartsWith(Bot.Command))
-                {
-                    Trimmed = Message.Text.Substring(Bot.Command);
-                }
-
-                if (Trimmed != string.Empty)
-                {
-                    Message.Command = Trimmed.Split(' ')[0];
-                    if (Message.Command.Contains("@") && !Message.Command.EndsWith(Mention))
-                    {
-                        //Another bot was requested
-                        Message.Command = null;
-                    }
-                    else
-                    {
-                        Message.Text = Trimmed.Substring(Message.Command).TrimStart();
-                        Message.Command = Message.Command.Replace(Mention, "");
-
-                        int InlineId;
-                        var PossibleId = Message.Text.Split(' ')[0];
-                        if (PossibleId.StartsWith("[") && PossibleId.EndsWith("]") && int.TryParse(PossibleId.Substring(1, PossibleId.Length - 2), out InlineId))
+                        if (e.Message.NewChatMember != null)
                         {
-                            Message.Text = Message.Text.Substring(PossibleId).TrimStart();
-                            Message.State = InlineId;
+                            await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Welcome, @{e.Message.NewChatMember.Username}!", replyToMessageId: e.Message.MessageId);
                         }
+                        else if (e.Message.LeftChatMember != null)
+                        {
+                            await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Bye, @{e.Message.LeftChatMember.Username}!", replyToMessageId: e.Message.MessageId);
+                        }
+
+                        return;
                     }
-                }
 
-                await Parser.Parse(Message);
-            }
-            else if (e.Message.From.Id.ToString() == Owner)
-            {
-                var JoinFeed = Bot.Command + Bot.JoinFeed + Mention + " ";
-
-                if (Text != null && Text.StartsWith(JoinFeed) && byte.TryParse(Text.Substring(JoinFeed), out JoinFeedId) && JoinFeedId < Bot.Feeds.Length)
-                {
-                    using (var Context = Bot.GetDb)
+                    if (e.Message.From.Id.ToString() == Owner && Text == Bot.Command + Bot.LeaveFeed + Mention)
                     {
-                        Context.TelegramFeedlink.Add(new TelegramFeedlink()
+                        using (var Context = Bot.GetDb)
+                        {
+                            Context.TelegramFeedlink.Attach(FeedLink);
+                            Context.TelegramFeedlink.Remove(FeedLink);
+                            await Context.SaveChangesAsync();
+                        }
+
+                        Bot.UpdateCache();
+                        Bot.Log($"Removed feed from {e.Message.Chat.Title} on {Mention}");
+                        return;
+                    }
+
+                    var Message = new ReceivedMessage
+                    {
+                        Feed = Bot.Feeds[FeedLink.Feed],
+                        Origin = new Destination
                         {
                             Token = Token,
-                            Chat = e.Message.Chat.Id,
-                            Feed = JoinFeedId
-                        });
+                            Chat = e.Message.Chat.Id.ToString()
+                        },
+                        MessageId = e.Message.MessageId.ToString(),
+                        Sender = e.Message.From.Id.ToString(),
+                        SenderMention = $"@{e.Message.From.Username}",
+                        Text = e.Message.Text,
+                        Mentions = new ReceivedMessageMention[0]
+                    };
 
-                        await Context.SaveChangesAsync();
+                    if (e.Message.ReplyToMessage != null)
+                    {
+                        var Entities = e.Message.Entities.Where(x => x.Type == MessageEntityType.Mention);
+                        if (Entities.Count() == 1)
+                        {
+                            var First = Entities.First();
+                            if (e.Message.Text.Substring(First.Offset + 1, First.Length - 1) == e.Message.ReplyToMessage.From.Username)
+                            {
+                                Message.Mentions = new[]
+                                {
+                                new ReceivedMessageMention
+                                {
+                                    Id = e.Message.ReplyToMessage.From.Id.ToString(),
+                                    Mention = $"@{e.Message.ReplyToMessage.From.Username}"
+                                }
+                            };
+                            }
+                        }
                     }
 
-                    Bot.UpdateCache();
-                    Bot.Log($"Added feed to {e.Message.Chat.Title} on {Mention}");
+                    var Trimmed = string.Empty;
+                    if (Message.Text.StartsWith(Bot.Command))
+                    {
+                        Trimmed = Message.Text.Substring(Bot.Command);
+                    }
+
+                    if (Trimmed != string.Empty)
+                    {
+                        Message.Command = Trimmed.Split(' ')[0];
+                        if (Message.Command.Contains("@") && !Message.Command.EndsWith(Mention))
+                        {
+                            //Another bot was requested
+                            Message.Command = null;
+                        }
+                        else
+                        {
+                            Message.Text = Trimmed.Substring(Message.Command).TrimStart();
+                            Message.Command = Message.Command.Replace(Mention, "");
+
+                            int InlineId;
+                            var PossibleId = Message.Text.Split(' ')[0];
+                            if (PossibleId.StartsWith("[") && PossibleId.EndsWith("]") && int.TryParse(PossibleId.Substring(1, PossibleId.Length - 2), out InlineId))
+                            {
+                                Message.Text = Message.Text.Substring(PossibleId).TrimStart();
+                                Message.State = InlineId;
+                            }
+                        }
+                    }
+
+                    await Parser.Parse(Message);
                 }
+                else if (e.Message.From.Id.ToString() == Owner)
+                {
+                    var JoinFeed = Bot.Command + Bot.JoinFeed + Mention + " ";
+
+                    if (Text != null && Text.StartsWith(JoinFeed) && byte.TryParse(Text.Substring(JoinFeed), out JoinFeedId) && JoinFeedId < Bot.Feeds.Length)
+                    {
+                        using (var Context = Bot.GetDb)
+                        {
+                            Context.TelegramFeedlink.Add(new TelegramFeedlink()
+                            {
+                                Token = Token,
+                                Chat = e.Message.Chat.Id,
+                                Feed = JoinFeedId
+                            });
+
+                            await Context.SaveChangesAsync();
+                        }
+
+                        Bot.UpdateCache();
+                        Bot.Log($"Added feed to {e.Message.Chat.Title} on {Mention}");
+                    }
+                }
+            }
+            catch (Exception Ex)
+            {
+                Bot.Log(Ex);
             }
         }
 
