@@ -195,11 +195,11 @@ namespace Mirai.Client
                     {
                         if (e.Message.NewChatMember != null)
                         {
-                            await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Welcome, @{e.Message.NewChatMember.Username}!", replyToMessageId: e.Message.MessageId);
+                            await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Welcome, @{e.Message.NewChatMember.Username ?? e.Message.NewChatMember.FirstName}!", replyToMessageId: e.Message.MessageId);
                         }
                         else if (e.Message.LeftChatMember != null)
                         {
-                            await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Bye, @{e.Message.LeftChatMember.Username}!", replyToMessageId: e.Message.MessageId);
+                            await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Bye, @{e.Message.LeftChatMember.Username ?? e.Message.LeftChatMember.FirstName}!", replyToMessageId: e.Message.MessageId);
                         }
 
                         return;

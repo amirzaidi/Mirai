@@ -41,7 +41,7 @@ namespace Mirai
             return Uri.TryCreate(Text, UriKind.Absolute, out WebRes);
         }
 
-        public static string WebResponse(this string Url, WebHeaderCollection Headers = null)
+        public static async Task<string> WebResponse(this string Url, WebHeaderCollection Headers = null)
         {
             for (int i = 0; i < 5; i++)
             {
@@ -53,7 +53,7 @@ namespace Mirai
                         Request.Headers = Headers;
                     }
 
-                    return new StreamReader(Request.GetResponse().GetResponseStream()).ReadToEnd();
+                    return await new StreamReader(Request.GetResponse().GetResponseStream()).ReadToEndAsync();
                 }
                 catch
                 {

@@ -188,7 +188,7 @@ namespace Mirai.Client
 
         public async Task UpdateCache()
         {
-            Mention = $"<@{Client.CurrentUser.Id}>";
+            Mention = Client.CurrentUser.Mention;
 
             FeedLinks.Clear();
             using (var Context = Bot.GetDb)

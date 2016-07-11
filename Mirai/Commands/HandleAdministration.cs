@@ -82,36 +82,10 @@ namespace Mirai.Commands
             await Message.Respond($"Your id is {Message.Sender}");
         }
 
-        internal static async Task Sleep(ReceivedMessage Message)
+        internal async Task JoinLink(ReceivedMessage Message)
         {
-        }
-
-        internal static async Task SetName(ReceivedMessage Message)
-        {
-        }
-
-        internal static async Task SetAvatar(ReceivedMessage Message)
-        {
-        }
-
-        internal static async Task Prune(ReceivedMessage Message)
-        {
-        }
-
-        internal static async Task Fix(ReceivedMessage Message)
-        {
-        }
-
-        internal static async Task Eval(ReceivedMessage Message)
-        {
-        }
-
-        internal static async Task JoinServer(ReceivedMessage Message)
-        {
-        }
-
-        internal static async Task LeaveServer(ReceivedMessage Message)
-        {
+            var Info = await Bot.Clients[Message.Origin.Token].Info();
+            await Message.Respond(Info.Join);
         }
     }
 }

@@ -9,8 +9,7 @@ namespace Mirai.Commands
         public static async Task Search(ReceivedMessage Message)
         {
             var RNG = new Random();
-
-            string Query = Message.Text;
+            var Query = Message.Text;
             if (Query.StartsWith("."))
             {
                 Query = Query.Substring(1);
@@ -27,7 +26,7 @@ namespace Mirai.Commands
 
             Query = Query.Replace(" ", "_");
 
-            var Result = ("http://danbooru.donmai.us/posts/random?tags=" + Query).WebResponse();
+            var Result = await ("http://danbooru.donmai.us/posts/random?tags=" + Query).WebResponse();
             var Matches = Regex.Matches(Result, "data-large-file-url=\"(?<id>.*?)\"");
             if (Matches.Count > 0 && (!Result.ToLower().Contains("kyoukai") && !Result.ToLower().Contains("kuriyama")))
             {
@@ -35,11 +34,11 @@ namespace Mirai.Commands
             }
             else
             {
-                Result = ("http://gelbooru.com/index.php?page=post&s=list&pid=0&tags=" + Query).WebResponse();
+                Result = await ("http://gelbooru.com/index.php?page=post&s=list&pid=0&tags=" + Query).WebResponse();
                 Matches = Regex.Matches(Result, "span id=\"s(?<id>\\d*)\"");
                 if (Matches.Count > 0 && (!Result.ToLower().Contains("kyoukai") && !Result.ToLower().Contains("kuriyama")))
                 {
-                    await Message.Respond(Regex.Match(("http://gelbooru.com/index.php?page=post&s=view&id=" + Matches[RNG.Next(0, Matches.Count)].Groups["id"].Value).WebResponse(), "\"(?<url>http://simg4.gelbooru.com//images.*?)\"").Groups["url"].Value, false);
+                    await Message.Respond(Regex.Match(await ("http://gelbooru.com/index.php?page=post&s=view&id=" + Matches[RNG.Next(0, Matches.Count)].Groups["id"].Value).WebResponse(), "\"(?<url>http://simg4.gelbooru.com//images.*?)\"").Groups["url"].Value, false);
                 }
                 else
                 {

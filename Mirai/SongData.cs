@@ -62,7 +62,7 @@ namespace Mirai
 
                 if (Regex.IsMatch(Query, "(.*)(soundcloud.com|snd.sc)(.*)"))
                 {
-                    var SC = ("http://api.soundcloud.com/resolve?url=" + Query + "&client_id=" + Bot.Config["SoundCloud"]).WebResponse();
+                    var SC = ("http://api.soundcloud.com/resolve?url=" + Query + "&client_id=" + Bot.Config["SoundCloud"]).WebResponse().Result;
                     if (SC != string.Empty && SC.StartsWith("{\"kind\":\"track\""))
                     {
                         var Response = JObject.Parse(SC);

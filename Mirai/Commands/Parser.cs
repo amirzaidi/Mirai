@@ -139,11 +139,12 @@ namespace Mirai.Commands
                 new Command(CommandType.Command, "clear", "Clears the current queue", Audio.Clear)
             });
 
-            /*Categories.Add(typeof(Trivia).Name, new [] {
-                new Command(CommandType.Command, new string[] { "starttrivia", "t" }, "Starts a trivia match in your channel", Trivia.Start),
-                new Command(CommandType.Command, new string[] { "leaderboard", "tl" }, "Shows the current trivia's leaderboard", Trivia.Leaderboards),
-                new Command(CommandType.Command, new string[] { "stoptrivia", "tq" }, "Stops a trivia match in your channel", Trivia.Stop)
-            });*/
+            Categories.Add(typeof(Trivia).Name, new [] {
+                new Command(CommandType.Command, new [] { "starttrivia", "t" }, "Starts a trivia match in your channel", Trivia.Start),
+                new Command(CommandType.Text, new [] { "." }, "Try to answer the trivia question", Trivia.Answer),
+                new Command(CommandType.Command, new [] { "points", "leaderboard", "tl" }, "Shows the current trivia's leaderboard", Trivia.Points),
+                new Command(CommandType.Command, new [] { "stoptrivia", "tq" }, "Stops a trivia match in your channel", Trivia.Stop)
+            });
 
             Categories.Add(typeof(Search).Name, new [] {
                 /*new Command(CommandType.Command, new string[] { "ask", "8ball", "answer" }, "Ask me a question", Search.Ask),

@@ -37,7 +37,7 @@ namespace Mirai.Commands
                 {
                     var Headers = new WebHeaderCollection();
                     Headers.Add("X-Mashape-Key", Bot.Config["Mashape"]);
-                    var Json = JObject.Parse($"https://mashape-community-urban-dictionary.p.mashape.com/define?term={Uri.EscapeUriString(Query)}".WebResponse(Headers));
+                    var Json = JObject.Parse(await $"https://mashape-community-urban-dictionary.p.mashape.com/define?term={Uri.EscapeUriString(Query)}".WebResponse(Headers));
                     Message.Respond(Json["list"][0]["definition"].ToString());
                 }
                 catch
