@@ -193,14 +193,14 @@ namespace Mirai.Client
                 {
                     if (Text == null)
                     {
-                        if (e.Message.NewChatMember != null)
+                        /*if (e.Message.NewChatMember != null)
                         {
                             await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Welcome, @{e.Message.NewChatMember.Username ?? e.Message.NewChatMember.FirstName}!", replyToMessageId: e.Message.MessageId);
                         }
                         else if (e.Message.LeftChatMember != null)
                         {
                             await Client.SendTextMessageAsync(e.Message.Chat.Id, $"Bye, @{e.Message.LeftChatMember.Username ?? e.Message.LeftChatMember.FirstName}!", replyToMessageId: e.Message.MessageId);
-                        }
+                        }*/
 
                         return;
                     }
@@ -365,71 +365,29 @@ namespace Mirai.Client
                         }
                     }
 
-                    var Files = SongData.LocalFiles(e.InlineQuery.Query);
+                    var Loading = new InlineKeyboardMarkup();
+                    Loading.InlineKeyboard = new InlineKeyboardButton[][] { new[] { new InlineKeyboardButton() } };
+                    Loading.InlineKeyboard[0][0].Text = "Loading..";
+                    Loading.InlineKeyboard[0][0].CallbackData = "/";
 
-                    var ListRequest = SongData.YT.Search.List("snippet");
-                    ListRequest.MaxResults = MusicHandler.MaxQueued - i;
+                    var Files = SongData.Search(e.InlineQuery.Query, 25);
 
-                    if (Files.Length < ListRequest.MaxResults)
+                    foreach (var SearchResult in Files)
                     {
-                        ListRequest.MaxResults -= Files.Length;
-
-                        foreach (var File in Files)
+                        Results.Add(new InlineQueryResultVideo
                         {
-                            Result = new InlineQueryResultVideo();
-                            Result.Id = (MsgId + i++).ToString();
-                            Result.Title = File;
-                            Result.Title = Result.Title;
-                            Result.Caption = Result.Title;
-                            Result.Description = "Music File";
-                            Result.ThumbUrl = "https://github.com/google/material-design-icons/blob/master/av/2x_web/ic_play_arrow_black_48dp.png?raw=true";
-                            Result.MimeType = "video/mp4";
-                            Result.Url = Result.ThumbUrl;
-                            Result.InputMessageContent = new InputTextMessageContent();
-                            ((InputTextMessageContent)Result.InputMessageContent).MessageText = $"/add{Mention} [{MsgId}] {Result.Title}";
-                            Result.ReplyMarkup = IKM("Loading..", Result.ThumbUrl, "/");
-                            Results.Add(Result);
-                        }
-                    }
+                            Id = (MsgId + i++).ToString(),
+                            Url = "http://music.botnets.me",
+                            MimeType = "text/html",
 
-                    if (e.InlineQuery.Query.IsValidUrl() && ListRequest.MaxResults != 0)
-                    {
-                        ListRequest.MaxResults--;
-
-                        Result = new InlineQueryResultVideo();
-                        Result.Id = (MsgId + i++).ToString();
-                        Result.Title = e.InlineQuery.Query;
-                        Result.Caption = Result.Title;
-                        Result.Description = "Remote File";
-                        Result.ThumbUrl = "https://github.com/google/material-design-icons/blob/master/av/2x_web/ic_play_arrow_black_48dp.png?raw=true";
-                        Result.MimeType = "video/mp4";
-                        Result.Url = Result.ThumbUrl;
-                        Result.InputMessageContent = new InputTextMessageContent();
-                        ((InputTextMessageContent)Result.InputMessageContent).MessageText = $"/add{Mention} [{MsgId}] {e.InlineQuery.Query}";
-                        Result.ReplyMarkup = IKM("Loading..", Result.ThumbUrl, "/");
-                        Results.Add(Result);
-                    }
-
-                    if (ListRequest.MaxResults != 0)
-                    {
-                        ListRequest.Q = e.InlineQuery.Query;
-                        ListRequest.Type = "video";
-
-                        foreach (var Video in (await ListRequest.ExecuteAsync()).Items)
-                        {
-                            Result = new InlineQueryResultVideo();
-                            Result.Id = (MsgId + i++).ToString();
-                            Result.Title = Video.Snippet.Title;
-                            Result.Caption = Result.Title;
-                            Result.Description = Video.Snippet.Description;
-                            Result.ThumbUrl = Video.Snippet.Thumbnails.Maxres?.Url ?? Video.Snippet.Thumbnails.Default__?.Url ?? string.Empty;
-                            Result.MimeType = "text/html";
-                            Result.Url = $"https://youtu.be/{Video.Id.VideoId}";
-                            Result.InputMessageContent = new InputTextMessageContent();
-                            ((InputTextMessageContent)Result.InputMessageContent).MessageText = $"/add{Mention} [{MsgId}] {Result.Url}";
-                            Result.ReplyMarkup = IKM("Open Song", Result.Url, "/");
-                            Results.Add(Result);
-                        }
+                            ThumbUrl = (SearchResult.Thumbnail != null && SearchResult.Thumbnail != string.Empty) ? SearchResult.Thumbnail : "https://github.com/google/material-design-icons/blob/master/av/2x_web/ic_note_black_48dp.png?raw=true",
+                            Title = SearchResult.FullName,
+                            InputMessageContent = new InputTextMessageContent
+                            {
+                                MessageText = $"/add@{Mention} [{MsgId}] {(SearchResult.Type == SongType.Local ? SearchResult.FullName : SearchResult.Url)}"
+                            },
+                            ReplyMarkup = Loading
+                        });
                     }
                 }
 

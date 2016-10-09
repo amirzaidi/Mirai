@@ -1,5 +1,4 @@
 ﻿using Mirai.Database.Tables;
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,17 +7,11 @@ using System.Threading.Tasks;
 
 namespace Mirai.Handlers
 {
-    struct TitledQuery
-    {
-        internal string Query;
-        internal string Title;
-    }
-
     class MusicHandler : IHandler
     {
         private FeedContext Feed;
         internal const int MaxQueued = 25;
-        internal ConcurrentQueue<TitledQuery> Queue = new ConcurrentQueue<TitledQuery>();
+        internal ConcurrentQueue<SongData> Queue = new ConcurrentQueue<SongData>();
         internal MusicProcessor Playing;
 
         private byte[] CurrentSend = null;
@@ -81,11 +74,7 @@ namespace Mirai.Handlers
                     Queries = Context.Song.Where(x => x.Feed == Feed.Id).OrderBy(x => x.Place).Select(x => x.Query).ToArray();
                 }
 
-                Queue = new ConcurrentQueue<TitledQuery>(Queries.Select(Query => new TitledQuery
-                {
-                    Query = Query,
-                    Title = new SongData(Query).Title
-                }));
+                Queue = new ConcurrentQueue<SongData>(Queries.Select(Query => SongData.Search(Query).FirstOrDefault()));
             });
         }
 
@@ -129,10 +118,10 @@ namespace Mirai.Handlers
                 if (Playing == null)
                 {
                     //Dequeue a song
-                    TitledQuery TitledQuery;
-                    if (Queue.TryDequeue(out TitledQuery))
+                    SongData SongData;
+                    if (Queue.TryDequeue(out SongData))
                     {
-                        Playing = new MusicProcessor(new SongData(TitledQuery.Query));
+                        Playing = new MusicProcessor(SongData);
                         await UpdateAll();
                     }
                 }
@@ -168,15 +157,11 @@ namespace Mirai.Handlers
             }
         }
 
-        internal async Task<int> AddSong(string Query, string Title, bool Update = true)
+        internal async Task<int> AddSong(SongData Data, bool Update = true)
         {
             if (Queue.Count < MaxQueued)
             {
-                Queue.Enqueue(new TitledQuery
-                {
-                    Query = Query,
-                    Title = Title
-                });
+                Queue.Enqueue(Data);
 
                 if (Update)
                 {
@@ -191,7 +176,7 @@ namespace Mirai.Handlers
 
         internal string Push(int Place, int ToPlace)
         {
-            var NewQueue = new ConcurrentQueue<TitledQuery>();
+            var NewQueue = new ConcurrentQueue<SongData>();
             var Songs = Queue.ToList();
             if (Place > 0 && ToPlace > 0 && Place != ToPlace && Songs.Count >= Place && Songs.Count >= ToPlace)
             {
@@ -223,15 +208,11 @@ namespace Mirai.Handlers
                     Count = MaxQueued - Songs.Length;
                 }
 
-                var NewQueue = new ConcurrentQueue<TitledQuery>();
+                var NewQueue = new ConcurrentQueue<SongData>();
 
                 for (int i = 0; i < Count; i++)
                 {
-                    NewQueue.Enqueue(new TitledQuery
-                    {
-                        Query = Playing.Song.Query,
-                        Title = Playing.Song.Title
-                    });
+                    NewQueue.Enqueue(Playing.Song);
                 }
 
                 foreach (var Song in Queue)
@@ -253,7 +234,7 @@ namespace Mirai.Handlers
             var Removed = new List<string>();
             int i = 0;
 
-            var NewQueue = new ConcurrentQueue<TitledQuery>();
+            var NewQueue = new ConcurrentQueue<SongData>();
             foreach (var Song in Queue.ToArray())
             {
                 if (Places.Contains(++i))
@@ -286,7 +267,7 @@ namespace Mirai.Handlers
                 {
                     Feed = Feed.Id,
                     Place = i++,
-                    Query = x.Query
+                    Query = x.Url
                 }).ToList();
 
                 if (Playing != null)
@@ -295,7 +276,7 @@ namespace Mirai.Handlers
                     {
                         Feed = Feed.Id,
                         Place = 0,
-                        Query = Playing.Song.Query
+                        Query = Playing.Song.Url
                     });
                 }
 

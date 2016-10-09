@@ -1,6 +1,7 @@
 ﻿using Google.Apis.YouTube.v3;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -8,119 +9,173 @@ using VideoLibrary;
 
 namespace Mirai
 {
-    class SongData
+    enum SongType
+    {
+        Local,
+        Remote,
+        YouTube,
+        SoundCloud
+    }
+    
+    struct SongData
     {
         internal static YouTubeService YT;
         internal static string MusicDir = Environment.ExpandEnvironmentVariables("%HOMEDRIVE%%HOMEPATH%") + "\\Music\\";
-        internal static string[] LocalFiles(string Search)
-        {
-            return new DirectoryInfo(MusicDir).GetFiles()
-                .Where(x => x.Name.Length >= Search.Length && x.Name.ToLower().Contains(Search.ToLower()) && !x.Attributes.HasFlag(FileAttributes.System))
-                .Select(x => x.Name)
-                .OrderBy(x => x)
-                .ToArray();
-        }
+        private static readonly Regex YoutubeVideoRegex = new Regex(@"youtu(?:\.be|be\.com)/(?:(.*)v(/|=)|(.*/)?)([a-zA-Z0-9-_]+)", RegexOptions.IgnoreCase);
+        
+        internal string FullName;
+        internal string Url;
+        internal string Adder;
+        internal SongType Type;
+        internal string Thumbnail;
 
-        internal bool Found;
-        internal string Query;
         internal string Title
         {
             get
             {
-                if (FullName.Length < 60)
+                if (FullName.Length < 100)
                 {
                     return FullName;
                 }
 
-                return FullName.Substring(0, 60);
+                return FullName.Substring(0, 100);
             }
         }
-        internal string FullName;
-        internal string Url;
 
-        internal SongData(object ToSearch)
+        internal string StreamUrl
         {
-            Found = false;
-            Query = ((string)ToSearch).Trim();
-            FullName = Query;
-            Url = Query;
-
-            if (Query == string.Empty)
+            get
             {
-                return;
-            }
-
-            try
-            {
-                var Local = LocalFiles(Query);
-                if (Local.Length > 0 && Local.Contains(Query))
+                if (Type == SongType.YouTube)
                 {
-                    Url = MusicDir + Query;
-                    Found = true;
-                    return;
+                    var Videos = YouTube.Default.GetAllVideos(Url);
+
+                    YouTubeVideo MaxVid = null;
+                    foreach (var Vid in Videos)
+                    {
+                        if (MaxVid == null || Vid.AudioBitrate >= MaxVid.AudioBitrate)
+                        {
+                            MaxVid = Vid;
+                        }
+                    }
+                    
+                    return MaxVid?.Uri ?? string.Empty;
                 }
-
-                if (Regex.IsMatch(Query, "(.*)(soundcloud.com|snd.sc)(.*)"))
+                else if (Type == SongType.SoundCloud)
                 {
-                    var SC = ("http://api.soundcloud.com/resolve?url=" + Query + "&client_id=" + Bot.Config["SoundCloud"]).WebResponse().Result;
+                    var SC = ($"http://api.soundcloud.com/resolve?url={Url}&client_id={Bot.Config["SoundCloud"]}").WebResponse().Result;
                     if (SC != string.Empty && SC.StartsWith("{\"kind\":\"track\""))
                     {
-                        var Response = JObject.Parse(SC);
-                        FullName = Response["title"].ToString();
-                        Url = Response["stream_url"] + "?client_id=" + Bot.Config["SoundCloud"];
-                        Found = true;
+                        return $"{JObject.Parse(SC)["stream_url"]}?client_id={Bot.Config["SoundCloud"]}";
                     }
-
-                    return;
                 }
 
-                string YouTubeUrl = string.Empty;
-                if (Query.IsValidUrl())
+                return Url;
+            }
+        }
+
+        internal SongData(string Url)
+        {
+            FullName = string.Empty;
+            this.Url = Url;
+            Type = SongType.YouTube;
+            Thumbnail = null;
+            Adder = null;
+
+            var Match = YoutubeVideoRegex.Match(Url);
+            if (Match.Success)
+            {
+                var Search = YT.Videos.List("snippet");
+                Search.Id = Match.Groups[4].Value;
+                var Videos = Search.Execute();
+                var Result = Videos.Items.First();
+                if (Result != null)
                 {
-                    if (Regex.IsMatch(Query, @"http(s)?://(www\.)?(youtu\.be|youtube\.com)[\w-/=&?]+"))
+                    FullName = Result.Snippet.Title;
+                    Thumbnail = Result.Snippet.Thumbnails.Maxres?.Url ?? Result.Snippet.Thumbnails.Default__?.Url;
+                }
+            }
+            else
+            {
+                Console.WriteLine("Invalid YouTube URL " + Url);
+            }
+        }
+
+        internal static List<SongData> Search(object ToSearch, int SoftLimit = 10)
+        {
+            var Query = ((string)ToSearch).Trim();
+            var Results = new List<SongData>();
+
+            if (Query.Length >= 3)
+            {
+                Results.AddRange(new DirectoryInfo(MusicDir).GetFiles()
+                    .Where(x => x.Name.Length >= Query.Length && x.Name.ToLower().Contains(Query.ToLower()) && !x.Attributes.HasFlag(FileAttributes.System))
+                    .OrderBy(x => x.Name)
+                    .Select(x => new SongData
                     {
-                        YouTubeUrl = Query;
+                        FullName = x.Name,
+                        Url = x.FullName,
+                        Type = SongType.Local
+                    }));
+            }
+
+            if (Query.IsValidUrl())
+            {
+                if (Regex.IsMatch(Query, @"http(s)?://(www\.)?(youtu\.be|youtube\.com)[\w-/=&?]+"))
+                {
+                    Results.Add(new SongData(Query));
+                }
+                else if (Regex.IsMatch(Query, "(.*)(soundcloud.com|snd.sc)(.*)"))
+                {
+                    try
+                    {
+                        var SC = ($"http://api.soundcloud.com/resolve?url={Query}&client_id={Bot.Config["SoundCloud"]}").WebResponse().Result;
+                        if (SC != string.Empty && SC.StartsWith("{\"kind\":\"track\""))
+                        {
+                            var Response = JObject.Parse(SC);
+                            Results.Add(new SongData
+                            {
+                                FullName = Response["title"].ToString(),
+                                Url = Query,
+                                Type = SongType.SoundCloud
+                            });
+                        }
                     }
-                    else
+                    catch (Exception Ex)
                     {
-                        Found = true;
-                        return;
+                        Console.WriteLine(Ex.ToString());
                     }
                 }
                 else
                 {
-                    var ListRequest = YT.Search.List("snippet");
-                    ListRequest.Q = Query;
-                    ListRequest.MaxResults = 1;
-                    ListRequest.Type = "video";
-                    foreach (var Result in ListRequest.Execute().Items)
+                    Results.Add(new SongData
                     {
-                        YouTubeUrl = "http://www.youtube.com/watch?v=" + Result.Id.VideoId;
-                    }
-                }
-
-                if (YouTubeUrl != string.Empty)
-                {
-                    var Videos = YouTube.Default.GetAllVideos(YouTubeUrl);
-
-                    var Adaptive = Videos.Where(Video => Video.AdaptiveKind == AdaptiveKind.Audio);
-                    if (Adaptive.Count() > 0)
-                    {
-                        Videos = Adaptive;
-                    }
-
-                    Videos = Videos.OrderByDescending(v => v.AudioBitrate);
-
-                    if (Videos.Count() > 0)
-                    {
-                        var Video = Videos.First();
-                        FullName = Video.Title.Substring(0, Video.Title.Length - 10);
-                        Url = Video.Uri;
-                        Found = true;
-                    }
+                        FullName = Query,
+                        Url = Query,
+                        Type = SongType.Remote
+                    });
                 }
             }
-            catch { }
+
+            if (Results.Count < SoftLimit)
+            {
+                var ListRequest = YT.Search.List("snippet");
+                ListRequest.Q = Query;
+                ListRequest.MaxResults = SoftLimit - Results.Count;
+                ListRequest.Type = "video";
+                foreach (var Result in ListRequest.Execute().Items)
+                {
+                    Results.Add(new SongData
+                    {
+                        FullName = Result.Snippet.Title,
+                        Url = $"http://www.youtube.com/watch?v={Result.Id.VideoId}",
+                        Type = SongType.YouTube,
+                        Thumbnail = Result.Snippet.Thumbnails.Maxres?.Url ?? Result.Snippet.Thumbnails.Default__?.Url
+                    });
+                }
+            }
+
+            return Results;
         }
     }
 }

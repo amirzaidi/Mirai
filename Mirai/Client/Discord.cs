@@ -46,8 +46,8 @@ namespace Mirai.Client
         public async Task Connect()
         {
             Client.MessageReceived += MessageReceived;
-            Client.UserJoined += UserJoined;
-            Client.UserLeft += UserLeft;
+            //Client.UserJoined += UserJoined;
+            //Client.UserLeft += UserLeft;
             Client.Log.Message += delegate (object sender, LogMessageEventArgs e)
             {
                 var Text = $"{e.Severity} ";
@@ -65,7 +65,7 @@ namespace Mirai.Client
 
             try
             {
-                await Client.Connect(Token);
+                await Client.Connect(Token, TokenType.Bot);
                 await UpdateCache();
             }
             catch (Exception Ex)

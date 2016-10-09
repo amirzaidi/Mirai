@@ -51,11 +51,11 @@ namespace Mirai.Commands
         {
             string AniToken;
             var API = GetAniApi(out AniToken);
-            var s = Message.Text.Replace('/', ' ');
+            var s = Message.Text.Replace('/', ' ').Trim();
 
             var SearchRequest = new RestRequest("/anime/search/" + Uri.EscapeUriString(s));
             SearchRequest.AddParameter("access_token", AniToken);
-            string SearchResString = API.Execute(SearchRequest).Content;
+            var SearchResString = API.Execute(SearchRequest).Content;
 
             if (SearchResString.Trim() != string.Empty && JToken.Parse(SearchResString) is JArray)
             {
@@ -90,38 +90,41 @@ namespace Mirai.Commands
         {
             string AniToken;
             var API = GetAniApi(out AniToken);
-            var s = Message.Text.Replace('/', ' ');
+            var s = Message.Text.Replace('/', ' ').Trim();
 
-            var SearchRequest = new RestRequest("/manga/search/" + Uri.EscapeUriString(s));
-            SearchRequest.AddParameter("access_token", AniToken);
-            string SearchResString = API.Execute(SearchRequest).Content;
-
-            if (SearchResString.Trim() != string.Empty && JToken.Parse(SearchResString) is JArray)
+            if (!s.StartsWith("@"))
             {
-                RestRequest InfoRequest = new RestRequest("/manga/" + JArray.Parse(SearchResString)[0]["id"]);
-                InfoRequest.AddParameter("access_token", AniToken);
+                var SearchRequest = new RestRequest("/manga/search/" + Uri.EscapeUriString(s));
+                SearchRequest.AddParameter("access_token", AniToken);
+                var SearchResString = API.Execute(SearchRequest).Content;
 
-                JObject Info = JObject.Parse(API.Execute(InfoRequest).Content);
-
-                string Title = "`" + Info["title_romaji"] + "`";
-                if (Title != Info["title_english"].ToString())
+                if (SearchResString.Trim() != string.Empty && JToken.Parse(SearchResString) is JArray)
                 {
-                    Title += " / `" + Info["title_english"] + "`";
-                }
+                    RestRequest InfoRequest = new RestRequest("/manga/" + JArray.Parse(SearchResString)[0]["id"]);
+                    InfoRequest.AddParameter("access_token", AniToken);
 
-                string Extra = "";
-                if (Info["total_chapters"].ToString() != "0" && Info["average_score"].ToString() != "0")
+                    JObject Info = JObject.Parse(API.Execute(InfoRequest).Content);
+
+                    string Title = "`" + Info["title_romaji"] + "`";
+                    if (Title != Info["title_english"].ToString())
+                    {
+                        Title += " / `" + Info["title_english"] + "`";
+                    }
+
+                    string Extra = "";
+                    if (Info["total_chapters"].ToString() != "0" && Info["average_score"].ToString() != "0")
+                    {
+                        Extra = Info["total_chapters"] + " Chapters (" + Info["publishing_status"] + ") - Scored " + Info["average_score"] + "\n";
+                    }
+
+                    Message.Respond(Title + "\n" + Extra +
+                        "Synopsis: " + WebUtility.HtmlDecode(Info["description"].ToString()).Replace("<br>", "\n").MaxSubstring(500, "...") + "\n" +
+                        "More info at http://anilist.co/manga/" + Info["id"] + "\n" + Info["image_url_lge"]);
+                }
+                else
                 {
-                    Extra = Info["total_chapters"] + " Chapters (" + Info["publishing_status"] + ") - Scored " + Info["average_score"] + "\n";
+                    Message.Respond("The manga could not be found");
                 }
-
-                Message.Respond(Title + "\n" + Extra +
-                    "Synopsis: " + WebUtility.HtmlDecode(Info["description"].ToString()).Replace("<br>", "\n").MaxSubstring(500, "...") + "\n" +
-                    "More info at http://anilist.co/manga/" + Info["id"] + "\n" + Info["image_url_lge"]);
-            }
-            else
-            {
-                Message.Respond("The manga could not be found");
             }
         }
 

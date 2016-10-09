@@ -10,13 +10,13 @@ namespace Mirai.Commands
     {
         internal static async Task Add(ReceivedMessage Message)
         {
-            var SongData = new SongData(Message.Text);
-            if (SongData.Found)
+            var SongDatas = SongData.Search(Message.Text);
+            if (SongDatas.Count != 0)
             {
-                var Place = await Message.Feed.Music.AddSong(Message.Text, SongData.Title);
+                var Place = await Message.Feed.Music.AddSong(SongDatas[0]);
                 if (Place > 0)
                 {
-                    await Message.Respond($"`{SongData.Title}` has been added at #{Place}");
+                    await Message.Respond($"`{SongDatas[0].Title}` has been added at #{Place}");
                 }
             }
             else
@@ -29,7 +29,7 @@ namespace Mirai.Commands
         {
             if (Message.Feed.Music.Playing != null)
             {
-                Message.Respond($"Skipped {Message.Feed.Music.Playing.Song.Title}");
+                Message.Respond($"Skipped `{Message.Feed.Music.Playing.Song.Title}`");
                 Message.Feed.Music.Playing.Skip = true;
             }
             else
@@ -69,7 +69,12 @@ namespace Mirai.Commands
 
                 if (ToAdd.Count == 0)
                 {
-                    Files = SongData.LocalFiles(Search);
+                    Files = new System.IO.DirectoryInfo(SongData.MusicDir).GetFiles()
+                        .Where(x => x.Name.Length >= Message.Text.Length && x.Name.ToLower().Contains(Message.Text.ToLower()) && !x.Attributes.HasFlag(System.IO.FileAttributes.System))
+                        .OrderBy(x => x.Name)
+                        .Select(x => x.Name)
+                        .ToArray();
+
                     if (Files.Length == 0)
                     {
                         Message.Respond("No files were found");
@@ -81,7 +86,7 @@ namespace Mirai.Commands
                     }
                     else
                     {
-                        string Info = "";
+                        var Info = string.Empty;
                         for (int i = 0; i < Files.Length; i++)
                         {
                             Info += (i + 1) + ". `" + Files[i] + "`\n";
@@ -92,18 +97,25 @@ namespace Mirai.Commands
                 }
                 else
                 {
+                    var Added = new List<string>();
                     foreach (var File in ToAdd.ToArray())
                     {
-                        if (await Message.Feed.Music.AddSong(File, File, false) == 0)
+                        var Place = await Message.Feed.Music.AddSong(new SongData
                         {
-                            ToAdd.Remove(File);
+                            FullName = File,
+                            Url = SongData.MusicDir + File,
+                            Type = SongType.Local
+                        }, false);
+                        if (Place != 0)
+                        {
+                            Added.Add($"{Place}. `{File}`");
                         }
                     }
                     
-                    if (ToAdd.Count > 0)
+                    if (Added.Count > 0)
                     {
                         Message.Feed.Music.UpdateAll();
-                        Message.Respond($"Added {ToAdd.Count} songs\n{string.Join("\n", ToAdd)}");
+                        Message.Respond($"Added {Added.Count} songs\n{string.Join("\n", Added)}");
                     }
                 }
             }
@@ -151,7 +163,7 @@ namespace Mirai.Commands
 
         internal static async Task Clear(ReceivedMessage Message)
         {
-            Message.Feed.Music.Queue = new ConcurrentQueue<Handlers.TitledQuery>();
+            Message.Feed.Music.Queue = new ConcurrentQueue<SongData>();
             Message.Respond($"The queue has been cleared");
             Message.Feed.Music.UpdateAll();
         }
@@ -159,7 +171,7 @@ namespace Mirai.Commands
         internal static async Task Shuffle(ReceivedMessage Message)
         {
             var Rand = new Random();
-            Message.Feed.Music.Queue = new ConcurrentQueue<Handlers.TitledQuery>(Message.Feed.Music.Queue.OrderBy(x => Rand.Next()));
+            Message.Feed.Music.Queue = new ConcurrentQueue<SongData>(Message.Feed.Music.Queue.OrderBy(x => Rand.Next()));
             Message.Respond($"The queue has been shuffled");
             Message.Feed.Music.UpdateAll();
         }
@@ -169,7 +181,7 @@ namespace Mirai.Commands
             var SongNames = await Message.Feed.Music.RemoveSongs(Message.Text.ParseInts());
             if (SongNames.Length > 0)
             {
-                await Message.Respond($"**Removed**\n{string.Join("\n", SongNames)}");
+                await Message.Respond($"**Removed**\n{string.Join("\n", SongNames.Select(x => $"`{x}`"))}");
             }
             else
             {

@@ -26,7 +26,7 @@ namespace Mirai
             Ffmpeg = Process.Start(new ProcessStartInfo
             {
                 FileName = "ffmpeg",
-                Arguments = "-i \"" + Song.Url + "\" -f s16le -ar 48000 -ac 2 pipe:1 -loglevel quiet",
+                Arguments = "-i \"" + Song.StreamUrl + "\" -f s16le -ar 48000 -ac 2 pipe:1 -loglevel quiet",
                 UseShellExecute = false,
                 RedirectStandardOutput = true
             });
