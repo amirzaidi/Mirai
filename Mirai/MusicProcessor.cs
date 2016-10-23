@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,11 +13,9 @@ namespace Mirai
         private static int MaxBuffer = (int)Math.Pow(2, 15);
 
         public SongData Song;
-        public bool Skip = false;
+        public CancellationTokenSource Skip = new CancellationTokenSource();
         public ConcurrentQueue<byte[]> QueuedBuffers = new ConcurrentQueue<byte[]>();
         private Process Ffmpeg;
-
-        public bool FinishedBuffer = false;
 
         public Semaphore Waiter = new Semaphore(MaxBuffer, MaxBuffer + 2);
 
@@ -34,35 +33,35 @@ namespace Mirai
                 {
                     FileName = "ffmpeg",
                     //Arguments = "-i \"" + Song.StreamUrl + "\" -f s16le -ar 48000 -ac 2 -v quiet pipe:1",
-                    Arguments = "-i pipe:0 -f s16le -ar 48000 -ac 2 -v quiet pipe:1",
+                    Arguments = "-re -i pipe:0 -f s16le -ar 48000 -ac 2 -v quiet pipe:1",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
                     RedirectStandardOutput = true
                 });
+                
+                var Response = await WebRequest.Create(Song.StreamUrl).GetResponseAsync();
 
-                var Cancel = new CancellationTokenSource();
-                var Response = await System.Net.WebRequest.Create(Song.StreamUrl).GetResponseAsync();
-                var Copying = Response.GetResponseStream().CopyToAsync(Ffmpeg.StandardInput.BaseStream, 81920, Cancel.Token);
+                Task.Run(async delegate
+                {
+                    try
+                    {
+                        await Response.GetResponseStream().CopyToAsync(Ffmpeg.StandardInput.BaseStream, 81920, Skip.Token);
+                        Bot.Log("Finished buffering " + Song.Title);
+                        Skip.Cancel();
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        Bot.Log("Cancelled buffering " + Song.Title);
+                    }
+                });
 
                 int Read = 0;
 
                 var ReadBuffer = new byte[0];
                 int ReadBufferUsed = 0;
 
-                int Fails = 0;
-
                 while (true)
                 {
-                    if (Skip)
-                    {
-                        if (ReadBuffer.Length != 0)
-                        {
-                            Buffers.Return(ReadBuffer);
-                        }
-
-                        break;
-                    }
-
                     if (ReadBufferUsed == ReadBuffer.Length)
                     {
                         if (ReadBufferUsed != 0)
@@ -76,27 +75,21 @@ namespace Mirai
                         ReadBuffer = Buffers.Take();
                     }
 
-                    Read = await Ffmpeg.StandardOutput.BaseStream.ReadAsync(ReadBuffer, ReadBufferUsed, ReadBuffer.Length - ReadBufferUsed);
-
-                    if (Read == 0)
+                    try
                     {
-                        if (++Fails == 15)
-                        {
-                            QueuedBuffers.Enqueue(ReadBuffer);
-                            break;
-                        }
-
-                        await Task.Delay(50);
-                    }
-                    else
-                    {
+                        Read = await Ffmpeg.StandardOutput.BaseStream.ReadAsync(ReadBuffer, ReadBufferUsed, ReadBuffer.Length - ReadBufferUsed, Skip.Token);
                         ReadBufferUsed += Read;
-                        Fails = 0;
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        break;
                     }
                 }
 
-                FinishedBuffer = true;
-                Bot.Log((Fails == 15 ? "Finished" : "Stopped") + " buffering " + Song.Title);
+                if (ReadBuffer.Length != 0)
+                {
+                    Buffers.Return(ReadBuffer);
+                }
 
                 if (Ffmpeg != null)
                 {
@@ -105,7 +98,6 @@ namespace Mirai
                 }
 
                 Ffmpeg = null;
-                Cancel.Cancel();
             }
             catch (Exception Ex)
             {

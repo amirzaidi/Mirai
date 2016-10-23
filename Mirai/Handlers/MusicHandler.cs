@@ -107,14 +107,6 @@ namespace Mirai.Handlers
         {
             if (Feed.AudioDestination.Length != 0)
             {
-                if (Playing != null && Playing.Skip)
-                {
-                    Playing.Dispose();
-                    Playing = null;
-                    await UpdateAll();
-                    await Task.Delay(50);
-                }
-
                 if (Playing == null)
                 {
                     //Dequeue a song
@@ -124,6 +116,12 @@ namespace Mirai.Handlers
                         Playing = new MusicProcessor(SongData);
                         await UpdateAll();
                     }
+                }
+                else if (Playing.Skip.IsCancellationRequested)
+                {
+                    Playing.Dispose();
+                    Playing = null;
+                    await UpdateAll();
                 }
                 else
                 {
@@ -148,10 +146,6 @@ namespace Mirai.Handlers
                     {
                         NextSend = Playing.QueuedBuffers.Dequeue();
                         Playing.Waiter.Release(1);
-                    }
-                    else if (Playing.FinishedBuffer)
-                    {
-                        Playing.Skip = true;
                     }
                 }
             }

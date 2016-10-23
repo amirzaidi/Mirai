@@ -29,8 +29,8 @@ namespace Mirai.Commands
         {
             if (Message.Feed.Music.Playing != null)
             {
-                Message.Respond($"Skipped `{Message.Feed.Music.Playing.Song.Title}`");
-                Message.Feed.Music.Playing.Skip = true;
+                Message.Respond($"Skipped `{Message.Feed.Music.Playing?.Song.Title}`");
+                Message.Feed.Music.Playing?.Skip.Cancel();
             }
             else
             {
