@@ -2,6 +2,7 @@
 using Mirai.Database.Tables;
 using Mirai.Handlers;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -52,17 +53,17 @@ namespace Mirai
             {
                 Timer = Task.Delay(1);
 
-                Parallel.ForEach(Handlers, async Handler =>
+                foreach (var Task in Handlers.Select(Handler => Handler.Tick()))
                 {
                     try
                     {
-                        await Handler.Tick();
+                        await Task;
                     }
                     catch (Exception Ex)
                     {
                         Bot.Log(Ex);
                     }
-                });
+                }
                 
                 await Timer;
             }

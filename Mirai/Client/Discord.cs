@@ -248,7 +248,7 @@ namespace Mirai.Client
 
                                 using (var Context = Bot.GetDb)
                                 {
-                                    if (!Context.DiscordFeedlink.Any(x => x.TextChannel != TextChannelId && ServerVoiceChannelIds.Contains(x.VoiceChannel)))
+                                    if (!Context.DiscordFeedlink.Any(x => x.Token == Token && x.TextChannel != TextChannelId && ServerVoiceChannelIds.Contains(x.VoiceChannel)))
                                     {
                                         Context.DiscordFeedlink.Attach(FeedLink);
                                         FeedLink.VoiceChannel = e.User.VoiceChannel?.Id.ToString();

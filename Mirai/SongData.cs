@@ -53,7 +53,7 @@ namespace Mirai
                     YouTubeVideo MaxVid = null;
                     foreach (var Vid in Videos)
                     {
-                        if (MaxVid == null || Vid.AudioBitrate >= MaxVid.AudioBitrate)
+                        if (Vid.AudioFormat == AudioFormat.Aac && (MaxVid == null || Vid.AudioBitrate >= MaxVid.AudioBitrate))
                         {
                             MaxVid = Vid;
                         }
@@ -105,6 +105,18 @@ namespace Mirai
         {
             var Query = ((string)ToSearch).Trim();
             var Results = new List<SongData>();
+
+            if (Query.StartsWith(MusicDir))
+            {
+                Results.Add(new SongData
+                {
+                    FullName = Query.Substring(MusicDir.Length),
+                    Url = Query,
+                    Type = SongType.Local
+                });
+
+                return Results;
+            }
 
             if (Query.Length >= 3)
             {

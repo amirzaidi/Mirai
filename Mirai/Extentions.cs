@@ -47,13 +47,13 @@ namespace Mirai
             {
                 try
                 {
-                    WebRequest Request = WebRequest.Create(Url);
+                    var Request = WebRequest.Create(Url);
                     if (Headers != null)
                     {
                         Request.Headers = Headers;
                     }
 
-                    return await new StreamReader(Request.GetResponse().GetResponseStream()).ReadToEndAsync();
+                    return await new StreamReader((await Request.GetResponseAsync()).GetResponseStream()).ReadToEndAsync();
                 }
                 catch
                 {

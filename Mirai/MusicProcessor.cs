@@ -23,28 +23,34 @@ namespace Mirai
         public MusicProcessor(SongData PlaySong)
         {
             Song = PlaySong;
-            Ffmpeg = Process.Start(new ProcessStartInfo
-            {
-                FileName = "ffmpeg",
-                Arguments = "-i \"" + Song.StreamUrl + "\" -f s16le -ar 48000 -ac 2 pipe:1 -loglevel quiet",
-                UseShellExecute = false,
-                RedirectStandardOutput = true
-            });
-
-            MainLoop();
+            Task.Run((Action)MainLoop);
         }
 
-        private async Task MainLoop()
+        private async void MainLoop()
         {
-            int Read = 0;
-
-            byte[] ReadBuffer = new byte[0];
-            int ReadBufferUsed = 0;
-
-            int Fails = 0;
-
             try
             {
+                Ffmpeg = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    //Arguments = "-i \"" + Song.StreamUrl + "\" -f s16le -ar 48000 -ac 2 -v quiet pipe:1",
+                    Arguments = "-i pipe:0 -f s16le -ar 48000 -ac 2 -v quiet pipe:1",
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true
+                });
+
+                var Cancel = new CancellationTokenSource();
+                var Response = await System.Net.WebRequest.Create(Song.StreamUrl).GetResponseAsync();
+                var Copying = Response.GetResponseStream().CopyToAsync(Ffmpeg.StandardInput.BaseStream, 81920, Cancel.Token);
+
+                int Read = 0;
+
+                var ReadBuffer = new byte[0];
+                int ReadBufferUsed = 0;
+
+                int Fails = 0;
+
                 while (true)
                 {
                     if (Skip)
@@ -74,7 +80,7 @@ namespace Mirai
 
                     if (Read == 0)
                     {
-                        if (++Fails == 10)
+                        if (++Fails == 15)
                         {
                             QueuedBuffers.Enqueue(ReadBuffer);
                             break;
@@ -90,27 +96,21 @@ namespace Mirai
                 }
 
                 FinishedBuffer = true;
-                Bot.Log((Fails == 10 ? "Finished" : "Stopped") + " buffering " + Song.Title);
-            }
-            catch (Exception Ex)
-            {
-                Bot.Log(Ex);
-            }
+                Bot.Log((Fails == 15 ? "Finished" : "Stopped") + " buffering " + Song.Title);
 
-            try
-            {
                 if (Ffmpeg != null)
                 {
                     Ffmpeg.Close();
                     Ffmpeg.Dispose();
                 }
+
+                Ffmpeg = null;
+                Cancel.Cancel();
             }
             catch (Exception Ex)
             {
                 Bot.Log(Ex);
             }
-
-            Ffmpeg = null;
         }
 
         public void Dispose()
