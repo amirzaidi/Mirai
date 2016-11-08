@@ -25,7 +25,6 @@ namespace Mirai
         
         internal string FullName;
         internal string Url;
-        internal string Adder;
         internal SongType Type;
         internal string Thumbnail;
 
@@ -74,33 +73,6 @@ namespace Mirai
             }
         }
 
-        internal SongData(string Url)
-        {
-            FullName = string.Empty;
-            this.Url = Url;
-            Type = SongType.YouTube;
-            Thumbnail = null;
-            Adder = null;
-
-            var Match = YoutubeVideoRegex.Match(Url);
-            if (Match.Success)
-            {
-                var Search = YT.Videos.List("snippet");
-                Search.Id = Match.Groups[4].Value;
-                var Videos = Search.Execute();
-                var Result = Videos.Items.First();
-                if (Result != null)
-                {
-                    FullName = Result.Snippet.Title;
-                    Thumbnail = Result.Snippet.Thumbnails.Maxres?.Url ?? Result.Snippet.Thumbnails.Default__?.Url;
-                }
-            }
-            else
-            {
-                Console.WriteLine("Invalid YouTube URL " + Url);
-            }
-        }
-
         internal static List<SongData> Search(object ToSearch, int SoftLimit = 10)
         {
             var Query = ((string)ToSearch).Trim();
@@ -135,7 +107,25 @@ namespace Mirai
             {
                 if (Regex.IsMatch(Query, @"http(s)?://(www\.)?(youtu\.be|youtube\.com)[\w-/=&?]+"))
                 {
-                    Results.Add(new SongData(Query));
+                    var Match = YoutubeVideoRegex.Match(Query);
+                    if (Match.Success)
+                    {
+                        var Search = YT.Videos.List("snippet");
+                        Search.Id = Match.Groups[4].Value;
+                        var Videos = Search.Execute();
+                        var Result = Videos.Items.First();
+                        if (Result != null)
+                        {
+                            Results.Add(new SongData
+                            {
+                                FullName = Result.Snippet.Title,
+                                Url = Query,
+                                Type = SongType.YouTube,
+                                Thumbnail = Result.Snippet.Thumbnails.Maxres?.Url ?? Result.Snippet.Thumbnails.Default__?.Url
+                            });
+                        }
+                    }
+
                 }
                 else if (Regex.IsMatch(Query, "(.*)(soundcloud.com|snd.sc)(.*)"))
                 {

@@ -12,7 +12,7 @@ namespace Mirai
         }
 
         private int MaxQueued;
-        private ConcurrentStack<byte[]> Buffers = new ConcurrentStack<byte[]>();
+        private ConcurrentQueue<byte[]> Buffers = new ConcurrentQueue<byte[]>();
 
         internal BufferPool(int UseBufferSize, int UseMaxQueued)
         {
@@ -23,7 +23,7 @@ namespace Mirai
         internal byte[] Take()
         {
             byte[] Return;
-            if (!Buffers.TryPop(out Return))
+            if (!Buffers.TryDequeue(out Return))
             {
                 Return = new byte[BufferSize];
             }
@@ -36,7 +36,7 @@ namespace Mirai
             if (ToReturn != null && ToReturn.Length == BufferSize && Buffers.Count < MaxQueued)
             {
                 Array.Clear(ToReturn, 0, ToReturn.Length);
-                Buffers.Push(ToReturn);
+                Buffers.Enqueue(ToReturn);
             }
         }
     }

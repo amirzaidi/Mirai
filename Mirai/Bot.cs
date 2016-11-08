@@ -23,6 +23,8 @@ namespace Mirai
         internal static string ShutdownCode;
         internal static Dictionary<string, string> Config = new Dictionary<string, string>();
 
+        private static SemaphoreSlim Waiter = new SemaphoreSlim(0, 1);
+
         internal static Database.MiraiContext GetDb
         {
             get
@@ -43,11 +45,11 @@ namespace Mirai
             }
 
             Log("Shutdown requested, shutting down ASAP");
-            
+
             Task.WaitAll(Feeds.Select(x => x.HandleTask).ToArray());
             Task.WaitAll(Clients.Values.Select(x => x.Disconnect()).ToArray());
 
-            Environment.Exit(0);
+            Waiter.Release();
         }
 
         static async void LoadAsync()
@@ -102,7 +104,7 @@ namespace Mirai
             ConsoleEvents.SetHandler(delegate
             {
                 ShutdownRequested = true;
-                Thread.Sleep(int.MaxValue);
+                Waiter.Wait();
             });
 
             AppDomain.CurrentDomain.UnhandledException += (s, e) =>

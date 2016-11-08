@@ -31,7 +31,11 @@ namespace Mirai.Commands
             " has shit taste",
             "'s waifu is trash",
             " your memes aren't even dank",
-            " you weird glasses-fetishist"
+            " you weird glasses-fetishist",
+            " your ass is jealous of the amount of shit that just came out of your mouth",
+            " you'll never be the man your mother is",
+            " no one will look for you during hide and seek",
+            " I'd stab you but shit stains"
         };
 
         internal async static Task Insult(ReceivedMessage Message)
@@ -40,12 +44,11 @@ namespace Mirai.Commands
             {
                 if (Message.Mentions[0].Id == Bot.Clients[Message.Origin.Token].Owner)
                 {
-                    Message.Respond("I would never do that!");
+                    await Message.Respond("I would never do that!");
                 }
                 else
                 {
-
-                    Message.Respond(Message.Mentions[0].Mention + Insults[Rand.Next(0, Insults.Length)]);
+                    await Message.Respond(Message.Mentions[0].Mention + Insults[Rand.Next(0, Insults.Length)]);
                 }
             }
         }
@@ -53,10 +56,7 @@ namespace Mirai.Commands
         private static string[] StabImgs = new []
         {
             "http://vignette1.wikia.nocookie.net/kyoukainokanata/images/5/5e/Stabbing-Akihito.png/revision/latest?cb=20131110041214",
-            "https://s-media-cache-ak0.pinimg.com/736x/1b/4a/2e/1b4a2e27fe20c0152131504a73498dd1.jpg",
-            "http://4.bp.blogspot.com/-nSDlmNZwBHw/Ul-bVRN5XvI/AAAAAAADrFE/ayEpwqy_gtc/s1600/KnK+-+03+-1.jpg",
-            "http://49.media.tumblr.com/9a8f4bc0fd0393cd6661da0e0012c2c3/tumblr_ne2iy1lRFQ1t9kr5po7_500.gif",
-             "http://45.media.tumblr.com/bc540ab848899db1584a0a04b4ef47a2/tumblr_mvgpuub6Pr1qbvovho1_500.gif"
+            "https://s-media-cache-ak0.pinimg.com/736x/1b/4a/2e/1b4a2e27fe20c0152131504a73498dd1.jpg"
         };
 
         internal async static Task Stab(ReceivedMessage Message)
@@ -65,11 +65,11 @@ namespace Mirai.Commands
             {
                 if (Message.Mentions[0].Id == Bot.Clients[Message.Origin.Token].Owner)
                 {
-                    Message.Respond("I would never do that!");
+                    await Message.Respond("I would never do that!");
                 }
                 else
                 {
-                    Message.Respond(Message.Mentions[0].Mention + " " + StabImgs[Rand.Next(0, StabImgs.Length)], false);
+                    await Message.Respond(Message.Mentions[0].Mention + " " + StabImgs[Rand.Next(0, StabImgs.Length)], false);
                 }
             }
         }

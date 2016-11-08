@@ -13,6 +13,7 @@ namespace Mirai.Handlers
         internal const int MaxQueued = 25;
         internal ConcurrentQueue<SongData> Queue = new ConcurrentQueue<SongData>();
         internal MusicProcessor Playing;
+        internal string Filter = string.Empty;
 
         private byte[] CurrentSend = null;
         private byte[] NextSend = null;
@@ -107,45 +108,43 @@ namespace Mirai.Handlers
         {
             if (Feed.AudioDestination.Length != 0)
             {
-                if (Playing == null)
+                SongData SongData;
+                if (Playing == null && Queue.TryDequeue(out SongData))
                 {
                     //Dequeue a song
-                    SongData SongData;
-                    if (Queue.TryDequeue(out SongData))
-                    {
-                        Playing = new MusicProcessor(SongData);
-                        await UpdateAll();
-                    }
+                    Playing = new MusicProcessor(SongData, Filter);
+                    Task.Delay(150).ContinueWith(x => UpdateAll());
                 }
-                else if (Playing.Skip.IsCancellationRequested)
+
+                if (NextSend != null)
                 {
-                    Playing.Dispose();
-                    Playing = null;
-                    await UpdateAll();
-                }
-                else
-                {
-                    if (NextSend != null)
+                    while (Sending.Count > 2)
                     {
-                        while (Sending.Count > 2)
-                        {
-                            await Sending.Dequeue();
-                        }
-
-                        Sending.Enqueue(Feed.StreamAll(NextSend));
-                        if (CurrentSend != null)
-                        {
-                            MusicProcessor.Buffers.Return(CurrentSend);
-                        }
-
-                        CurrentSend = NextSend;
-                        NextSend = null;
+                        await Sending.Dequeue();
                     }
 
+                    Sending.Enqueue(Feed.StreamAll(NextSend));
+                    if (CurrentSend != null)
+                    {
+                        MusicProcessor.Buffers.Return(CurrentSend);
+                    }
+
+                    CurrentSend = NextSend;
+                    NextSend = null;
+                }
+
+                if (Playing != null)
+                {
                     if (Playing.QueuedBuffers.Count > 0)
                     {
                         NextSend = Playing.QueuedBuffers.Dequeue();
                         Playing.Waiter.Release(1);
+                    }
+                    else if (Playing.Skip.IsCancellationRequested)
+                    {
+                        Playing.Dispose();
+                        Playing = null;
+                        await UpdateAll();
                     }
                 }
             }

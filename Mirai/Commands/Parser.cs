@@ -131,11 +131,13 @@ namespace Mirai.Commands
                 new Command(CommandType.Command, new [] { "add", "q" }, "Adds a song title to the music queue", Audio.Add),
                 new Command(CommandType.Command, new [] { "local", "addlocal", "l" }, "Adds a local song title to the music queue", Audio.Local),
                 new Command(CommandType.Command, new [] { "push", "p" }, "Pushes a song to the top of the music queue", Audio.Push),
-                new Command(CommandType.Command, new [] { "repeat" }, "Repeats the currently playing song", Audio.Repeat),
+                new Command(CommandType.Command, new [] { "repeat" }, "Repeats the currently playing song once more", Audio.Repeat),
+                new Command(CommandType.Command, new [] { "restart" }, "Restarts the currently playing song", Audio.Restart),
                 new Command(CommandType.Command, new [] { "remove", "r" }, "Removes a song from the music queue", Audio.Remove),
                 new Command(CommandType.Command, new [] { "playing", "song", "np", "playlist", "lq", "queue" }, "Shows the current song and playlist", Audio.Playing),
                 new Command(CommandType.Command, new [] { "skip", "next", "n" }, "Skips the current song", Audio.Skip),
                 new Command(CommandType.Command, new [] { "shuffle", "s" }, "Shuffles the current queue", Audio.Shuffle),
+                new Command(CommandType.Command, new [] { "filter", "af" }, "Adds a filter to FFMpeg", Audio.Filter),
                 new Command(CommandType.Command, "clear", "Clears the current queue", Audio.Clear)
             });
 
@@ -144,19 +146,6 @@ namespace Mirai.Commands
                 new Command(CommandType.Text, new [] { "." }, "Try to answer the trivia question", Trivia.Answer),
                 new Command(CommandType.Command, new [] { "points", "leaderboard", "tl" }, "Shows the current trivia's leaderboard", Trivia.Points),
                 new Command(CommandType.Command, new [] { "stoptrivia", "tq" }, "Stops a trivia match in your channel", Trivia.Stop)
-            });
-
-            Categories.Add(typeof(Search).Name, new [] {
-                /*new Command(CommandType.Command, new string[] { "ask", "8ball", "answer" }, "Ask me a question", Search.Ask),
-                new Command(CommandType.Command, new string[] { "youtube", "yt" }, "Searches for a youtube video", Search.Youtube),
-                new Command(CommandType.Command, new string[] { "image", "img" }, "Search for an image", Search.Image),*/
-                new Command(CommandType.Command, "osu", "Show someone's osu stats", Search.Osu),
-                //new Command(CommandType.Command, new string[] { "avatar", "av" }, "Show someone's avatar", Search.Avatar),
-                new Command(CommandType.Command, new [] { "define", "ud", "what's", "whats", "who's", "whos" }, "Search for a term", Search.Define),
-                new Command(CommandType.Command, "anime", "Search for an anime - shorthand {name}", Search.Anime),
-                new Command(CommandType.Command, "manga", "Search for a manga - shorthand <name>", Search.Manga),
-                new Command(CommandType.Text, new [] { "{", "}" }, "Search for an anime", Search.AnimeShort),
-                new Command(CommandType.Text, new [] { "<", ">" }, "Search for a manga", Search.MangaShort)
             });
 
             Categories.Add(typeof(Lewd).Name, new [] {
@@ -204,6 +193,19 @@ namespace Mirai.Commands
                 new Command(CommandType.Text, "\\o/", "", "\\o/"),
                 new Command(CommandType.Text, "/lenny", "", "( ͡° ͜ʖ ͡°)"),
                 //new Command(CommandType.None, "$$$", "", Trivia.Points)
+            });
+
+            Categories.Add(typeof(Search).Name, new[] {
+                /*new Command(CommandType.Command, new string[] { "ask", "8ball", "answer" }, "Ask me a question", Search.Ask),
+                new Command(CommandType.Command, new string[] { "youtube", "yt" }, "Searches for a youtube video", Search.Youtube),
+                new Command(CommandType.Command, new string[] { "image", "img" }, "Search for an image", Search.Image),*/
+                new Command(CommandType.Command, "osu", "Show someone's osu stats", Search.Osu),
+                //new Command(CommandType.Command, new string[] { "avatar", "av" }, "Show someone's avatar", Search.Avatar),
+                new Command(CommandType.Command, new [] { "define", "ud", "what's", "whats", "who's", "whos" }, "Search for a term", Search.Define),
+                new Command(CommandType.Command, "anime", "Search for an anime - shorthand {name}", Search.Anime),
+                new Command(CommandType.Command, "manga", "Search for a manga - shorthand <name>", Search.Manga),
+                new Command(CommandType.Text, new [] { "{", "}" }, "Search for an anime", Search.AnimeShort),
+                new Command(CommandType.Text, new [] { "<", ">" }, "Search for a manga", Search.MangaShort)
             });
         }
 

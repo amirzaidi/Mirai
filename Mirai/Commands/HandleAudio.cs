@@ -30,7 +30,8 @@ namespace Mirai.Commands
             if (Message.Feed.Music.Playing != null)
             {
                 Message.Respond($"Skipped `{Message.Feed.Music.Playing?.Song.Title}`");
-                Message.Feed.Music.Playing?.Skip.Cancel();
+                //Message.Feed.Music.Playing?.Skip.Cancel();
+                Message.Feed.Music.Playing?.Stop();
             }
             else
             {
@@ -161,6 +162,17 @@ namespace Mirai.Commands
             }
         }
 
+        internal static async Task Restart(ReceivedMessage Message)
+        {
+            int Count = 1;
+            var PlayingTitle = Message.Feed.Music.Repeat(ref Count);
+            if (PlayingTitle != null)
+            {
+                Message.Respond($"Restarted `{PlayingTitle}`");
+                Message.Feed.Music.Playing?.Stop();
+            }
+        }
+
         internal static async Task Clear(ReceivedMessage Message)
         {
             Message.Feed.Music.Queue = new ConcurrentQueue<SongData>();
@@ -174,6 +186,12 @@ namespace Mirai.Commands
             Message.Feed.Music.Queue = new ConcurrentQueue<SongData>(Message.Feed.Music.Queue.OrderBy(x => Rand.Next()));
             Message.Respond($"The queue has been shuffled");
             Message.Feed.Music.UpdateAll();
+        }
+
+        internal static async Task Filter(ReceivedMessage Message)
+        {
+            Message.Feed.Music.Filter = Message.Text;
+            Message.Respond($"The filter has been set");
         }
 
         internal static async Task Remove(ReceivedMessage Message)
