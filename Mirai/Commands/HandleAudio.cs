@@ -10,18 +10,39 @@ namespace Mirai.Commands
     {
         internal static async Task Add(ReceivedMessage Message)
         {
-            var SongDatas = SongData.Search(Message.Text);
-            if (SongDatas.Count != 0)
+            List<SongData> List;
+
+            var SplitPlaylist = Message.Text.Split(new[] { "/playlist?list=" }, StringSplitOptions.None);
+            if (SplitPlaylist.Length == 2)
             {
-                var Place = await Message.Feed.Music.AddSong(SongDatas[0]);
-                if (Place > 0)
+                string Name = string.Empty;
+
+                List = SongData.Playlist(SplitPlaylist[1], ref Name);
+                if (List.Count != 0)
                 {
-                    await Message.Respond($"`{SongDatas[0].Title}` has been added at #{Place}");
+                    var Return = await Message.Feed.Music.AddSongs(List.ToArray());
+                    await Message.Respond($"`{Name}` ({Return[0]}) has been added at #{Return[1]}");
+                }
+                else
+                {
+                    await Message.Respond("That playlist can not be found");
                 }
             }
             else
             {
-                await Message.Respond("That song can not be found");
+                List = SongData.Search(Message.Text);
+                if (List.Count != 0)
+                {
+                    var Place = await Message.Feed.Music.AddSong(List[0]);
+                    if (Place > 0)
+                    {
+                        await Message.Respond($"`{List[0].Title}` has been added at #{Place}");
+                    }
+                }
+                else
+                {
+                    await Message.Respond("That song can not be found");
+                }
             }
         }
 
@@ -30,7 +51,6 @@ namespace Mirai.Commands
             if (Message.Feed.Music.Playing != null)
             {
                 Message.Respond($"Skipped `{Message.Feed.Music.Playing?.Song.Title}`");
-                //Message.Feed.Music.Playing?.Skip.Cancel();
                 Message.Feed.Music.Playing?.Stop();
             }
             else

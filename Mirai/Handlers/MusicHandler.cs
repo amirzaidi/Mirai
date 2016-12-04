@@ -10,7 +10,7 @@ namespace Mirai.Handlers
     class MusicHandler : IHandler
     {
         private FeedContext Feed;
-        internal const int MaxQueued = 25;
+        internal const int MaxQueued = 50;
         internal ConcurrentQueue<SongData> Queue = new ConcurrentQueue<SongData>();
         internal MusicProcessor Playing;
         internal string Filter = string.Empty;
@@ -151,6 +151,40 @@ namespace Mirai.Handlers
         }
 
         internal async Task<int> AddSong(SongData Data, bool Update = true)
+        {
+            if (Queue.Count < MaxQueued)
+            {
+                Queue.Enqueue(Data);
+
+                if (Update)
+                {
+                    UpdateAll();
+                }
+
+                return Queue.Count;
+            }
+
+            return 0;
+        }
+
+        internal async Task<int[]> AddSongs(SongData[] Data, bool Update = true)
+        {
+            int i;
+
+            for (i = 0; i < Data.Length && Queue.Count < MaxQueued; i++)
+            {
+                Queue.Enqueue(Data[i]);
+            }
+
+            if (Update)
+            {
+                UpdateAll();
+            }
+
+            return new[] { i, Queue.Count - i + 1 };
+        }
+
+        internal async Task<int> AddSongs(SongData Data, bool Update = true)
         {
             if (Queue.Count < MaxQueued)
             {

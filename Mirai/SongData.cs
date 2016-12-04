@@ -179,5 +179,42 @@ namespace Mirai
 
             return Results;
         }
+
+        internal static List<SongData> Playlist(string List, ref string Name)
+        {
+            var Vids = new List<SongData>();
+            
+            var S1 = YT.Search.List("snippet");
+            S1.Q = List;
+            var Response = S1.Execute();
+            if (Response.Items.Count != 0)
+            {
+                Name = Response.Items[0].Snippet.Title;
+
+                var S = YT.PlaylistItems.List("snippet,contentDetails");
+                S.PlaylistId = Response.Items[0].Id.PlaylistId;
+                S.MaxResults = 50;
+
+                do
+                {
+                    var E = S.Execute();
+                    foreach (var Result in E.Items)
+                    {
+                        Vids.Add(new SongData
+                        {
+                            FullName = Result.Snippet.Title,
+                            Url = $"http://www.youtube.com/watch?v={Result.ContentDetails.VideoId}",
+                            Type = SongType.YouTube,
+                            Thumbnail = Result.Snippet.Thumbnails.Maxres?.Url ?? Result.Snippet.Thumbnails.Default__?.Url
+                        });
+                    }
+
+                    S.PageToken = E.NextPageToken;
+                }
+                while (S.PageToken != null);
+            }
+
+            return Vids;
+        }
     }
 }
