@@ -134,41 +134,43 @@ namespace Mirai.Client
         private static bool SendAudio = false;
         public async Task Stream(string Chat, byte[] Sound)
         {
-            var ChatId = ulong.Parse(Chat);
+            IAudioClient AudioClient = null;
 
-            IAudioClient AudioClient;
-            if (!AudioClients.TryGetValue(ChatId, out AudioClient) || AudioClient.Channel.Id != ChatId)
+            try
             {
-                var Channel = Client.Servers.SelectMany(x => x.VoiceChannels).Where(x => x.Id == ChatId).FirstOrDefault();
-                if (Channel == null)
-                {
-                    return;
-                }
-                
-                AudioClient = await Channel.JoinAudio();
+                var ChatId = ulong.Parse(Chat);
 
-                IAudioClient Old;
-                AudioClients.TryRemove(ChatId, out Old);
-                if (AudioClients.TryAdd(ChatId, AudioClient))
+                if (!AudioClients.TryGetValue(ChatId, out AudioClient) || AudioClient.CancelToken.IsCancellationRequested)
                 {
-                    SendAudio = false;
-                    Task.Delay(750).ContinueWith(delegate { SendAudio = true; });
+                    var Channel = Client.Servers.SelectMany(x => x.VoiceChannels).Where(x => x.Id == ChatId).FirstOrDefault();
+                    if (Channel == null)
+                    {
+                        return;
+                    }
+                    
+                    AudioClients.TryRemove(ChatId, out AudioClient);
+                    AudioClient = await Channel.JoinAudio();
+
+                    if (AudioClients.TryAdd(ChatId, AudioClient))
+                    {
+                        SendAudio = false;
+                        Task.Delay(750).ContinueWith(delegate { SendAudio = true; });
+                    }
                 }
-            }
-            else if (AudioClient.State != ConnectionState.Connected)
-            {
-                await AudioClient.Join(AudioClient.Channel);
-            }
-            else if (Sound != null && SendAudio)
-            {
-                try
+                else if (AudioClient.State != ConnectionState.Connected)
+                {
+                    Bot.Log("Connecting to audio in voice chat #" + ChatId);
+                    AudioClient = await AudioClient.Channel.JoinAudio();
+                }
+                else if (Sound != null && SendAudio)
                 {
                     await AudioClient.OutputStream.WriteAsync(Sound, 0, Sound.Length);
                 }
-                catch (Exception Ex)
-                {
-                    Bot.Log(Ex);
-                }
+            }
+            catch (Exception Ex)
+            {
+                Bot.Log(Ex);
+                await AudioClient?.Disconnect();
             }
         }
 

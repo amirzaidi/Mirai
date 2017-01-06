@@ -71,14 +71,13 @@ namespace Mirai
             }
             catch (TaskCanceledException)
             {
-
             }
             catch (Exception Ex)
             {
                 Bot.Log(Ex);
             }
 
-            await Ffmpeg.StandardInput.WriteAsync("q");
+            //await Ffmpeg.StandardInput.WriteAsync("q");
 
             Ffmpeg.Close();
             Ffmpeg.Dispose();

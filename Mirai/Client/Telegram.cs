@@ -54,10 +54,7 @@ namespace Mirai.Client
 
         public async Task Disconnect()
         {
-            if (Client != null)
-            {
-                Client.StopReceiving();
-            }
+            Client?.StopReceiving();
         }
 
         public async Task Send(SendMessage Message)
@@ -384,7 +381,7 @@ namespace Mirai.Client
                             Title = SearchResult.FullName,
                             InputMessageContent = new InputTextMessageContent
                             {
-                                MessageText = $"/add@{Mention} [{MsgId}] {(SearchResult.Type == SongType.Local ? SearchResult.FullName : SearchResult.Url)}"
+                                MessageText = $"/add{Mention} [{MsgId}] {(SearchResult.Type == SongType.Local ? SearchResult.FullName : SearchResult.Url)}"
                             },
                             ReplyMarkup = Loading
                         });
